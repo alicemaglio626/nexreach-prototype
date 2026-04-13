@@ -1341,13 +1341,14 @@ function WorkspaceScreen({
     setSelectedRows(new Set());
   };
 
-  const toastMessages: Record<ActionType, string> = isEmrRemote
+  const isEmrrContext = isEmrRemote || (isInbound && effectiveMethod === 'emr-remote');
+  const toastMessages: Record<ActionType, string> = isEmrrContext
     ? { schedule: 'Credential Progress Updated', research: 'Record Requests Sent to Research', pend: 'Record Requests Pended', reroute: 'Record Requests Rerouted' }
     : { schedule: 'Record Requests Scheduled', research: 'Record Requests Sent to Research', pend: 'Record Requests Pended', reroute: 'Record Requests Rerouted' };
 
   // Apply action to rows (update status + commitment date for schedule)
   const applyAction = (action: ActionType, global?: boolean, customStatus?: string, commitDate?: string, paymentRequired?: boolean) => {
-    const statusMap: Record<ActionType, string> = isEmrRemote
+    const statusMap: Record<ActionType, string> = isEmrrContext
       ? { schedule: 'Outreach In Progress', research: 'In Research', pend: 'Pended', reroute: 'Rerouted' }
       : { schedule: 'Scheduled', research: 'In Research', pend: 'Pended', reroute: 'Rerouted' };
     const finalStatus = customStatus || statusMap[action];
@@ -1589,7 +1590,7 @@ function WorkspaceScreen({
                     </Text>
                     <Group gap="sm" wrap="wrap">
                       {((isInbound && effectiveMethod === 'emr-remote') || (!isInbound && isEmrRemote)
-                        ? [['Save Progress', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
+                        ? [['Update Progress', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
                         : [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
                       ).map(([label, action]) => (
                         <Button
@@ -1768,8 +1769,8 @@ function WorkspaceScreen({
                           <Select
                             comboboxProps={{ zIndex: 10001 }}
                             placeholder="Select"
-                            data={isEmrRemote ? [
-                              { value: 'schedule', label: 'Save Progress' },
+                            data={(isEmrRemote || (isInbound && effectiveMethod === 'emr-remote')) ? [
+                              { value: 'schedule', label: 'Update Progress' },
                               { value: 'research', label: 'Send to Research' },
                               { value: 'pend', label: 'Pend' },
                               { value: 'reroute', label: 'Reroute' },
