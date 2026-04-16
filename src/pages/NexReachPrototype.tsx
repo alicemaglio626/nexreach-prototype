@@ -8,6 +8,7 @@ import {
   ScrollArea,
   Table,
   Checkbox as MantineCheckbox,
+  Tooltip,
 } from '@mantine/core';
 import {
   Button,
@@ -80,6 +81,50 @@ const MEMBER_NAMES = [
 ];
 const PLANS = ['Aetna', 'Cigna', 'UnitedHealthcare', 'Humana'];
 const ROW_METHODS = ['Onsite', 'Offsite', 'Offsite', 'Onsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'Offsite', 'Onsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'Onsite', 'Offsite'];
+const SLOC_ADDRESSES = [
+  '12847 Longsborough Avenue, Suite 3300, Fountainbleau Heights, CA 90210',
+  '456 Oak Ave, Ste 200, Chicago, IL 60601',
+  '9500 Euclid Avenue, Building JJ-30, Cleveland Heights, OH 44106',
+  '789 Elm St, Unit B, Dallas, TX 75201',
+  '3400 Civic Center Blvd, Suite 4000, Philadelphia, PA 19104',
+  '123 Main St., #330, New York, NY 12345',
+  '55 Water St, Fl 3, Boston, MA 02109',
+  '2799 W Grand Boulevard, Suite K-150, Detroit, MI 48202',
+  '100 Park Ave, Rm 200, Atlanta, GA 30303',
+  '8110 Meadowbrook Drive, Suite 210, Westchester County, NY 10601',
+  '321 Broad St, Ste 50, Newark, NJ 07102',
+  '4800 Sand Point Way NE, Suite 300, Seattle, WA 98105',
+  '200 River Rd, Unit 1A, Austin, TX 78701',
+  '6000 Legacy Drive, Building C-400, Plano, TX 75024',
+  '15 Grove St, Apt 2, Portland, OR 97201',
+  '1001 Peachtree Street NE, Suite 1500, Atlanta, GA 30309',
+  '77 Franklin Ave, Ste 9, Denver, CO 80203',
+  '3200 Westchester Avenue, Suite 100, Purchase, NY 10577',
+  '42 Liberty St, Fl 4, Miami, FL 33130',
+  '950 Pennsylvania Ave NW, Suite 700, Washington, DC 20004',
+];
+const SITE_ADDRESSES = [
+  '123 Main St., #330, New York, NY 12345',
+  '12847 Longsborough Avenue, Suite 3300, Fountainbleau Heights, CA 90210',
+  '456 Oak Ave, Ste 200, Chicago, IL 60601',
+  '3400 Civic Center Blvd, Suite 4000, Philadelphia, PA 19104',
+  '789 Elm St, Unit B, Dallas, TX 75201',
+  '2799 W Grand Boulevard, Suite K-150, Detroit, MI 48202',
+  '100 Park Ave, Rm 200, Atlanta, GA 30303',
+  '9500 Euclid Avenue, Building JJ-30, Cleveland Heights, OH 44106',
+  '55 Water St, Fl 3, Boston, MA 02109',
+  '321 Broad St, Ste 50, Newark, NJ 07102',
+  '8110 Meadowbrook Drive, Suite 210, Westchester County, NY 10601',
+  '200 River Rd, Unit 1A, Austin, TX 78701',
+  '4800 Sand Point Way NE, Suite 300, Seattle, WA 98105',
+  '15 Grove St, Apt 2, Portland, OR 97201',
+  '6000 Legacy Drive, Building C-400, Plano, TX 75024',
+  '77 Franklin Ave, Ste 9, Denver, CO 80203',
+  '1001 Peachtree Street NE, Suite 1500, Atlanta, GA 30309',
+  '42 Liberty St, Fl 4, Miami, FL 33130',
+  '3200 Westchester Avenue, Suite 100, Purchase, NY 10577',
+  '950 Pennsylvania Ave NW, Suite 700, Washington, DC 20004',
+];
 const REQUEST_ROWS = MEMBER_NAMES.map((member, i) => ({
   id: String(387216389 + i),
   plan: PLANS[i % PLANS.length],
@@ -92,7 +137,9 @@ const REQUEST_ROWS = MEMBER_NAMES.map((member, i) => ({
   payment: '—',
   osRef: `87991820${9887 + i}`,
   practitioner: 'BARNES, TAYLOR',
-  site: '123 Main St. ...',
+  sdos: `0${(i % 9) + 1}/01/2026-0${(i % 9) + 1}/28/2026`,
+  sloc: SLOC_ADDRESSES[i % SLOC_ADDRESSES.length],
+  site: SITE_ADDRESSES[i % SITE_ADDRESSES.length],
 }));
 
 const CALL_HISTORY_ROWS = [
@@ -1275,6 +1322,7 @@ function WorkspaceScreen({
   const [toast, setToast] = useState<string | null>(null);
   const [tableAction, setTableAction] = useState<string | null>(null);
   const [mixedMethodError, setMixedMethodError] = useState(false);
+  const [siteDetailsCollapsed, setSiteDetailsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
@@ -1311,7 +1359,7 @@ function WorkspaceScreen({
   const filteredToSingleMethod = methodFilter && methodFilter.size === 1;
   const activeMethod = filteredToSingleMethod ? Array.from(methodFilter)[0] : null;
   const effectiveMethod = isInbound ? (activeMethod === 'EMRR' ? 'emr-remote' : activeMethod?.toLowerCase() || null) : retrievalMethod;
-  const canTakeGlobalAction = isInbound ? (isConnected && filteredToSingleMethod) : isConnected;
+  const canTakeGlobalAction = isInbound ? (isConnected && filteredToSingleMethod && activeMethod !== 'EMRR') : isConnected;
   const canTakeAction = isConnected;
 
   const toggleRow = (id: string) => {
@@ -1323,7 +1371,7 @@ function WorkspaceScreen({
     });
   };
 
-  const unactionedRows = requestRows.filter(r => r.status === 'New');
+  const unactionedRows = requestRows.filter(r => r.status === 'New' && !(isInbound && r.rowMethod === 'EMRR'));
 
   const toggleAll = () => {
     if (selectedRows.size === unactionedRows.length && unactionedRows.length > 0) {
@@ -1341,7 +1389,7 @@ function WorkspaceScreen({
     setSelectedRows(new Set());
   };
 
-  const isEmrrContext = isEmrRemote || (isInbound && effectiveMethod === 'emr-remote');
+  const isEmrrContext = isEmrRemote;
   const toastMessages: Record<ActionType, string> = isEmrrContext
     ? { schedule: 'Credential Progress Updated', research: 'Record Requests Sent to Research', pend: 'Record Requests Pended', reroute: 'Record Requests Rerouted' }
     : { schedule: 'Record Requests Scheduled', research: 'Record Requests Sent to Research', pend: 'Record Requests Pended', reroute: 'Record Requests Rerouted' };
@@ -1431,53 +1479,100 @@ function WorkspaceScreen({
       {/* Two-column body */}
       <Box style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
-        {/* LEFT PANEL — Site Details */}
-        <Box style={{ width: 233, minWidth: 233, flexShrink: 0, overflowY: 'auto', padding: '20px' }}>
-          <Box style={{ backgroundColor: '#f7f6f4', borderRadius: 12, padding: '20px 16px' }}>
-            <Group justify="space-between" align="center" mb={16}>
-              <Text size="md" fw={500}>Site Details</Text>
-              <Text size="xs" fw={500} style={{ color: '#006ccf', cursor: 'pointer' }} onClick={() => setEditSiteOpen(true)}>Edit</Text>
-            </Group>
-
-            <Stack gap="md">
-              {[
-                { label: 'Site Name', value: 'Manhattan Internal Medicine' },
-                { label: 'Primary Address', value: '123 Main St., #330,\nNew York, NY 12345' },
-                { label: 'Phone Number', value: '718-555-1234' },
-                { label: 'Fax Number', value: '718-555-5678' },
-                { label: 'Primary Contact', value: 'Mason Reed' },
-                { label: 'Primary Contact Email', value: 'mason@manhattanim.com' },
-                { label: 'Preferred Retrieval Method', value: isInbound ? 'Offsite, Onsite, EMRR' : retrievalMethod === 'onsite' ? 'Onsite' : retrievalMethod === 'emr-remote' ? 'EMRR' : 'Offsite' },
-              ].map(({ label, value }) => (
-                <Box key={label}>
-                  <Text size="sm" style={{ color: '#4f4e4c' }}>{label}</Text>
-                  <Text size="sm" style={{ whiteSpace: 'pre-line', lineHeight: 1.4, color: '#242423' }}>{value}</Text>
-                </Box>
-              ))}
-              {/* Site Access Type hidden for now */}
-            </Stack>
-
-            {/* Agent Notes button */}
-            <Box style={{ borderTop: '1px solid #e7e5df', marginTop: 16, paddingTop: 16 }}>
+        {/* LEFT PANEL — Site Details with collapse toggle */}
+        {siteDetailsCollapsed ? (
+          /* Collapsed: vertical tab affixed to the left edge */
+          <Box
+            onClick={() => setSiteDetailsCollapsed(false)}
+            style={{
+              flexShrink: 0, alignSelf: 'stretch',
+              width: 28,
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+              paddingTop: 24,
+              cursor: 'pointer',
+            }}
+          >
+            <Box
+              style={{
+                background: '#f7f6f4',
+                border: '1px solid #e7e5df',
+                borderLeft: 'none',
+                borderRadius: '0 8px 8px 0',
+                padding: '14px 6px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                boxShadow: '2px 0 6px rgba(0,0,0,0.06)',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eaf5ff'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#f7f6f4'; }}
+            >
+              <IconChevronRight size={13} color="#4f4e4c" />
+              <Text size="xs" fw={500} style={{ writingMode: 'vertical-rl', color: '#4f4e4c', letterSpacing: '0.3px', whiteSpace: 'nowrap', transform: 'rotate(180deg)' }}>Site Details</Text>
+            </Box>
+          </Box>
+        ) : (
+          /* Expanded: full panel with collapse button straddling right edge of card */
+          <Box style={{ width: 233, minWidth: 233, flexShrink: 0, overflowY: 'auto', padding: '20px' }}>
+            <Box style={{ backgroundColor: '#f7f6f4', borderRadius: 12, padding: '20px 16px', position: 'relative' }}>
+              {/* Collapse button — straddles right edge of the card */}
               <Box
-                onClick={() => setNotesDrawerOpen(true)}
+                onClick={() => setSiteDetailsCollapsed(true)}
                 style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '10px 12px', borderRadius: 8, background: '#fff',
-                  border: '1px solid #e7e5df', cursor: 'pointer', transition: 'all 0.15s',
+                  position: 'absolute', right: -14, top: 64,
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: '#fff', border: '1px solid #e7e5df',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', zIndex: 10,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#eaf5ff'; e.currentTarget.style.borderColor = '#006ccf'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e7e5df'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#006ccf'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e7e5df'; }}
               >
-                <Group gap={8}>
-                  <IconNotes size={14} color="#006ccf" />
-                  <Text size="sm" fw={500} style={{ color: '#242423' }}>Agent Notes</Text>
-                </Group>
-                <Badge status="prominent" type="number">{notes.length}</Badge>
+                <IconChevronLeft size={14} color="#4f4e4c" />
+              </Box>
+              <Group justify="space-between" align="center" mb={16}>
+                <Text size="md" fw={500}>Site Details</Text>
+                <Text size="xs" fw={500} style={{ color: '#006ccf', cursor: 'pointer' }} onClick={() => setEditSiteOpen(true)}>Edit</Text>
+              </Group>
+
+              <Stack gap="md">
+                {[
+                  { label: 'Site Name', value: 'Manhattan Internal Medicine' },
+                  { label: 'Primary Address', value: '123 Main St., #330,\nNew York, NY 12345' },
+                  { label: 'Phone Number', value: '718-555-1234' },
+                  { label: 'Fax Number', value: '718-555-5678' },
+                  { label: 'Primary Contact', value: 'Mason Reed' },
+                  { label: 'Primary Contact Email', value: 'mason@manhattanim.com' },
+                  { label: 'Preferred Retrieval Method', value: isInbound ? 'Offsite, Onsite, EMRR' : retrievalMethod === 'onsite' ? 'Onsite' : retrievalMethod === 'emr-remote' ? 'EMRR' : 'Offsite' },
+                ].map(({ label, value }) => (
+                  <Box key={label}>
+                    <Text size="sm" style={{ color: '#4f4e4c' }}>{label}</Text>
+                    <Text size="sm" style={{ whiteSpace: 'pre-line', lineHeight: 1.4, color: '#242423' }}>{value}</Text>
+                  </Box>
+                ))}
+              </Stack>
+
+              {/* Agent Notes button */}
+              <Box style={{ borderTop: '1px solid #e7e5df', marginTop: 16, paddingTop: 16 }}>
+                <Box
+                  onClick={() => setNotesDrawerOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 12px', borderRadius: 8, background: '#fff',
+                    border: '1px solid #e7e5df', cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#eaf5ff'; e.currentTarget.style.borderColor = '#006ccf'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#e7e5df'; }}
+                >
+                  <Group gap={8}>
+                    <IconNotes size={14} color="#006ccf" />
+                    <Text size="sm" fw={500} style={{ color: '#242423' }}>Agent Notes</Text>
+                  </Group>
+                  <Badge status="prominent" type="number">{notes.length}</Badge>
+                </Box>
               </Box>
             </Box>
           </Box>
-        </Box>
+        )}
 
         {/* RIGHT CONTENT AREA */}
         <Box style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
@@ -1589,7 +1684,7 @@ function WorkspaceScreen({
                         : 'Use the below buttons to apply the same outcome to all record requests within the group.'}
                     </Text>
                     <Group gap="sm" wrap="wrap">
-                      {((isInbound && effectiveMethod === 'emr-remote') || (!isInbound && isEmrRemote)
+                      {((!isInbound && isEmrRemote)
                         ? [['Update Progress', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
                         : [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
                       ).map(([label, action]) => (
@@ -1805,7 +1900,7 @@ function WorkspaceScreen({
 
                     {/* Request table */}
                     <Box style={{ overflowX: 'auto', border: '1px solid #e7e5df', borderRadius: 6 }}>
-                        <Table highlightOnHover style={{ minWidth: 1200, borderCollapse: 'collapse' }}>
+                        <Table highlightOnHover style={{ minWidth: 1500, borderCollapse: 'collapse' }}>
                           <Table.Thead>
                             <Table.Tr style={{ backgroundColor: '#f7f6f4', borderBottom: '1px solid #e7e5df' }}>
                               <Table.Th style={{ width: 40, padding: '8px' }}><MantineCheckbox size="xs" disabled={!canTakeAction} checked={selectedRows.size === unactionedRows.length && unactionedRows.length > 0} indeterminate={selectedRows.size > 0 && selectedRows.size < unactionedRows.length} onChange={toggleAll} /></Table.Th>
@@ -1814,13 +1909,15 @@ function WorkspaceScreen({
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Health Plan</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Member Name</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Member DOB</Text></Table.Th>
+                              <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>SDOS</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Project Due Date</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Commitment Date</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Scheduling Status</Text></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Payment Status</Text></Table.Th>
                               {retrievalMethod === 'onsite' && <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>OS-Ref</Text></Table.Th>}
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Practitioner</Text></Table.Th>
-                              <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Site</Text></Table.Th>
+                              <Table.Th style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>SLOC</Text></Table.Th>
+                              <Table.Th style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Site</Text></Table.Th>
                             </Table.Tr>
                           </Table.Thead>
                           <Table.Tbody style={{ opacity: canTakeAction ? 1 : 0.5, pointerEvents: canTakeAction ? 'auto' : 'none' }}>
@@ -1838,7 +1935,7 @@ function WorkspaceScreen({
                                         onClick={() => setRequestRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'New', commit: '—', payment: '—' } : r))}
                                       />
                                     ) : (
-                                      <MantineCheckbox size="xs" disabled={!canTakeAction} checked={isSelected} onChange={() => toggleRow(row.id)} />
+                                      <MantineCheckbox size="xs" disabled={!canTakeAction || (isInbound && row.rowMethod === 'EMRR')} checked={isSelected} onChange={() => toggleRow(row.id)} />
                                     )}
                                   </Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.id}</Text></Table.Td>
@@ -1846,13 +1943,61 @@ function WorkspaceScreen({
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.plan}</Text></Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ whiteSpace: 'nowrap', color: '#333231' }}>{row.member}</Text></Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.dob}</Text></Table.Td>
+                                  <Table.Td style={{ padding: '8px' }}>
+                                    <Text size="sm" style={{ color: '#333231', lineHeight: 1.4 }}>
+                                      {row.sdos.split('-').map((date, i, arr) => (
+                                        <span key={i} style={{ display: 'block', whiteSpace: 'nowrap' }}>
+                                          {i === 0 ? `${date}–` : date}
+                                        </span>
+                                      ))}
+                                    </Text>
+                                  </Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.due}</Text></Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.commit}</Text></Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.status}</Text></Table.Td>
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.payment}</Text></Table.Td>
                                   {retrievalMethod === 'onsite' && <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.osRef}</Text></Table.Td>}
                                   <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ whiteSpace: 'nowrap', color: '#333231' }}>{row.practitioner}</Text></Table.Td>
-                                  <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ whiteSpace: 'nowrap', color: '#333231' }}>{row.site}</Text></Table.Td>
+                                  {[row.sloc, row.site].map((addr, ci) => {
+                                    const parts = addr.split(',').map(p => p.trim());
+                                    let lines: string[];
+                                    if (parts.length >= 4) {
+                                      const stateZip = parts[3].trim().split(' ');
+                                      lines = [
+                                        `${parts[0]}, ${parts[1]}`,
+                                        `${parts[2]}, ${stateZip[0]}`,
+                                        stateZip.slice(1).join(' '),
+                                      ];
+                                    } else {
+                                      lines = parts;
+                                    }
+                                    const truncStr = (s: string, max: number) => {
+                                      if (s.length <= max) return s;
+                                      const cut = s.lastIndexOf(' ', max);
+                                      return (cut > 0 ? s.slice(0, cut) : s.slice(0, max)).replace(/,\s*$/, '') + '\u2026';
+                                    };
+                                    const needsTooltip = addr.length > 45;
+                                    const fullAddress = lines.join('\n');
+                                    const displayLines = needsTooltip
+                                      ? [truncStr(lines[0], 20), truncStr(lines[1] || '', 18)].filter(Boolean)
+                                      : lines;
+                                    const content = (
+                                      <Text size="sm" style={{ color: '#333231', lineHeight: 1.4 }}>
+                                        {displayLines.map((line, li) => (
+                                          <span key={li} style={{ display: 'block' }}>{line}</span>
+                                        ))}
+                                      </Text>
+                                    );
+                                    return (
+                                      <Table.Td key={ci} style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+                                        {needsTooltip ? (
+                                          <Tooltip label={<span style={{ whiteSpace: 'pre-line' }}>{fullAddress}</span>} position="bottom" withArrow>
+                                            <div style={{ cursor: 'default' }}>{content}</div>
+                                          </Tooltip>
+                                        ) : content}
+                                      </Table.Td>
+                                    );
+                                  })}
                                 </Table.Tr>
                               );
                             })}
