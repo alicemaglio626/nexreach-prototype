@@ -83,47 +83,47 @@ const PLANS = ['Aetna', 'Cigna', 'UnitedHealthcare', 'Humana'];
 const ROW_METHODS = ['Onsite', 'Offsite', 'Offsite', 'Onsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'Offsite', 'Onsite', 'EMRR', 'Offsite', 'Onsite', 'Offsite', 'Onsite', 'Offsite'];
 const SLOC_ADDRESSES = [
   '12847 Longsborough Avenue, Suite 3300, Fountainbleau Heights, NY 10970',
-  '456 Oak Ave, Ste 200, Bronx, NY 10451',
+  '123 Main St, #330, New York, NY 10001',
   '9500 Euclid Avenue, Building JJ-30, Forest Hills, NY 11375',
   '789 Elm St, Unit B, Brooklyn, NY 11201',
-  '3400 Civic Center Blvd, Suite 4000, Flushing, NY 11354',
-  '123 Main St., #330, New York, NY 10001',
-  '55 Water St, Fl 3, Manhattan, NY 10041',
+  '3400 Civic Center Boulevard, Suite 4000, Flushing, NY 11354',
+  '55 Water St, Fl 3, New York, NY 10041',
+  '14 Wall St, Fl 10, New York, NY 10005',
   '2799 W Grand Boulevard, Suite K-150, Jamaica, NY 11432',
-  '100 Park Ave, Rm 200, New York, NY 10017',
+  '42 Liberty St, #2, New York, NY 10005',
   '8110 Meadowbrook Drive, Suite 210, Westchester County, NY 10601',
-  '321 Broad St, Ste 50, Staten Island, NY 10301',
+  '30 E 20th St, #5A, New York, NY 10003',
   '4800 Northern Boulevard, Suite 300, Great Neck, NY 11020',
-  '200 River Rd, Unit 1A, Tarrytown, NY 10591',
+  '9 W 57th St, Rm 3, New York, NY 10019',
   '6000 Sunrise Highway, Building C-400, Massapequa, NY 11758',
-  '15 Grove St, Apt 2, White Plains, NY 10601',
+  '100 Park Ave, Rm 4, New York, NY 10017',
   '1001 Grand Concourse, Suite 1500, Bronx, NY 10452',
-  '77 Franklin Ave, Ste 9, Garden City, NY 11530',
+  '1 Penn Plaza, Fl 6, New York, NY 10119',
   '3200 Westchester Avenue, Suite 100, Purchase, NY 10577',
-  '42 Liberty St, Fl 4, New York, NY 10005',
+  '5 Main St, Ste 1B, Bronx, NY 10451',
   '950 Pennsylvania Avenue, Suite 700, Brooklyn, NY 11207',
 ];
 const SITE_ADDRESSES = [
-  '123 Main St., #330, New York, NY 10001',
+  '123 Main St, #330, New York, NY 10001',
   '12847 Longsborough Avenue, Suite 3300, Fountainbleau Heights, NY 10970',
-  '456 Oak Ave, Ste 200, Bronx, NY 10451',
-  '3400 Civic Center Blvd, Suite 4000, Flushing, NY 11354',
   '789 Elm St, Unit B, Brooklyn, NY 11201',
+  '3400 Civic Center Boulevard, Suite 4000, Flushing, NY 11354',
+  '55 Water St, Fl 3, New York, NY 10041',
   '2799 W Grand Boulevard, Suite K-150, Jamaica, NY 11432',
-  '100 Park Ave, Rm 200, New York, NY 10017',
   '9500 Euclid Avenue, Building JJ-30, Forest Hills, NY 11375',
-  '55 Water St, Fl 3, Manhattan, NY 10041',
-  '321 Broad St, Ste 50, Staten Island, NY 10301',
+  '14 Wall St, Fl 10, New York, NY 10005',
   '8110 Meadowbrook Drive, Suite 210, Westchester County, NY 10601',
-  '200 River Rd, Unit 1A, Tarrytown, NY 10591',
+  '42 Liberty St, #2, New York, NY 10005',
   '4800 Northern Boulevard, Suite 300, Great Neck, NY 11020',
-  '15 Grove St, Apt 2, White Plains, NY 10601',
-  '6000 Sunrise Highway, Building C-400, Massapequa, NY 11758',
-  '77 Franklin Ave, Ste 9, Garden City, NY 11530',
+  '30 E 20th St, #5A, New York, NY 10003',
   '1001 Grand Concourse, Suite 1500, Bronx, NY 10452',
-  '42 Liberty St, Fl 4, New York, NY 10005',
+  '9 W 57th St, Rm 3, New York, NY 10019',
+  '6000 Sunrise Highway, Building C-400, Massapequa, NY 11758',
+  '100 Park Ave, Rm 4, New York, NY 10017',
   '3200 Westchester Avenue, Suite 100, Purchase, NY 10577',
+  '1 Penn Plaza, Fl 6, New York, NY 10119',
   '950 Pennsylvania Avenue, Suite 700, Brooklyn, NY 11207',
+  '5 Main St, Ste 1B, Bronx, NY 10451',
 ];
 const REQUEST_ROWS = MEMBER_NAMES.map((member, i) => ({
   id: String(387216389 + i),
@@ -1971,22 +1971,12 @@ function WorkspaceScreen({
                                     } else {
                                       lines = parts;
                                     }
-                                    const truncStr = (s: string, max: number) => {
-                                      if (s.length <= max) return s;
-                                      const cut = s.lastIndexOf(' ', max);
-                                      return (cut > 0 ? s.slice(0, cut) : s.slice(0, max)).replace(/,\s*$/, '') + '\u2026';
-                                    };
                                     const needsTooltip = addr.length > 45;
                                     const fullAddress = lines.join('\n');
-                                    const displayLines = needsTooltip
-                                      ? [truncStr(lines[0], 20), truncStr(lines[1] || '', 18)].filter(Boolean)
-                                      : lines;
                                     const content = (
-                                      <Text size="sm" style={{ color: '#333231', lineHeight: 1.4 }}>
-                                        {displayLines.map((line, li) => (
-                                          <span key={li} style={{ display: 'block' }}>{line}</span>
-                                        ))}
-                                      </Text>
+                                      <div style={{ fontSize: 14, color: '#333231', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'pre-line' }}>
+                                        {fullAddress}
+                                      </div>
                                     );
                                     return (
                                       <Table.Td key={ci} style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}>
