@@ -857,9 +857,9 @@ export function NexReachNotes() {
               <Tabs.Panel value="workspace">
                 <Stack gap="xl">
 
-                  {/* Global Outcomes */}
+                  {/* Bulk Actions */}
                   <Box>
-                    <Text fw={600} mb={4}>Global Outcomes</Text>
+                    <Text fw={600} mb={4}>Bulk Actions</Text>
                     <Text size="sm" c="dimmed" mb={12}>
                       Apply an outcome to all requests at this site in bulk.
                     </Text>
@@ -975,7 +975,7 @@ export function NexReachNotes() {
                             <Table.Th><Text size="xs" fw={600}>Member DOB</Text></Table.Th>
                             <Table.Th><Text size="xs" fw={600}>Project Due Date</Text></Table.Th>
                             <Table.Th><Text size="xs" fw={600}>Commitment Date</Text></Table.Th>
-                            <Table.Th><Text size="xs" fw={600}>Scheduling Status</Text></Table.Th>
+                            <Table.Th><Text size="xs" fw={600}>Status</Text></Table.Th>
                             <Table.Th><Text size="xs" fw={600}>Payment Status</Text></Table.Th>
                             <Table.Th><Text size="xs" fw={600}>OS-Ref</Text></Table.Th>
                             <Table.Th><Text size="xs" fw={600}>Practitioner</Text></Table.Th>
