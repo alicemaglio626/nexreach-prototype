@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon-cyan.png" />
+    <script>
+      (function(l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&');
+          }).join('?');
+          window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+          );
+        }
+      }(window.location));
+    </script>
+    <link rel="icon" type="image/png" href="/nexreach-prototype/favicon-cyan.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Datavant Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -11,8 +23,8 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/assets/index-BmtIlHdM.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-_stwLx3j.css">
+    <script type="module" crossorigin src="/nexreach-prototype/assets/index-BmtIlHdM.js"></script>
+    <link rel="stylesheet" crossorigin href="/nexreach-prototype/assets/index-_stwLx3j.css">
   </head>
   <body>
     <div id="root"></div>
