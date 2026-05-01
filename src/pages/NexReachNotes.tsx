@@ -955,7 +955,7 @@ export function NexReachNotes() {
                         <Box style={{ flex: 1 }} />
                         <FilterPill label="Project Due Date" />
                         <FilterPill label="Commitment Date" />
-                        <FilterPill label="Scheduling Status" />
+                        <FilterPill label="Status" />
                         <FilterPill label="Practitioner" />
                         <ActionIcon intent="neutral" appearance="ghost" aria-label="Reset filters">
                           <IconRefresh size={14} />
