@@ -1027,6 +1027,7 @@ function EmrrSaveProgressModal({ count, onClose, onSubmit, siteAccessType, onSit
   const statusOptions = [
     { value: 'outreach_in_progress', label: 'Outreach In Progress' },
     { value: 'credentialing_in_progress', label: 'Credentialing In Progress' },
+    { value: 'credentialing_invalid', label: 'Credentialing Invalid' },
     { value: 'awaiting_queued', label: 'Awaiting Queued' },
     { value: 'awaiting_assignment', label: 'Awaiting Assignment' },
   ];
@@ -1048,6 +1049,7 @@ function EmrrSaveProgressModal({ count, onClose, onSubmit, siteAccessType, onSit
     const statusLabels: Record<string, string> = {
       outreach_in_progress: 'Outreach In Progress',
       credentialing_in_progress: 'Credentialing In Progress',
+      credentialing_invalid: 'Credentialing Invalid',
       awaiting_queued: 'Awaiting Queued',
       awaiting_assignment: 'Awaiting Assignment',
     };
@@ -1781,6 +1783,7 @@ function WorkspaceScreen({
                             {([
                                 { label: 'Outreach In Prog', color: '#006ccf' },
                                 { label: 'Credentialing In Prog', color: '#7c3aed' },
+                                { label: 'Credentialing Invalid', color: '#dc2626' },
                                 { label: 'Awaiting Queued', color: '#d97706' },
                                 { label: 'Awaiting Assignment', color: '#059669' },
                             ]).map((s) => {
@@ -1832,7 +1835,7 @@ function WorkspaceScreen({
                           {retrievalMethod === 'onsite' ? (
                             <FilterPill label="Outcome" options={['Scheduled', 'In Research', 'Rerouted', 'Pended', 'Progress Logged', 'No Availability']} selected={filters['Outcome']} onToggle={(v) => toggleFilter('Outcome', v)} />
                           ) : isEmrRemote ? (
-                            <FilterPill label="Status" options={['New', 'Outreach In Progress', 'Credentialing In Progress', 'Awaiting Queued', 'Awaiting Assignment', 'In Research', 'Rerouted', 'Pended']} selected={filters['Status']} onToggle={(v) => toggleFilter('Status', v)} />
+                            <FilterPill label="Status" options={['New', 'Outreach In Progress', 'Credentialing In Progress', 'Credentialing Invalid', 'Awaiting Queued', 'Awaiting Assignment', 'In Research', 'Rerouted', 'Pended']} selected={filters['Status']} onToggle={(v) => toggleFilter('Status', v)} />
                           ) : (
                             <FilterPill label="Status" options={['New', 'Scheduled', 'In Research', 'Rerouted', 'Pended', 'Progress Logged']} selected={filters['Status']} onToggle={(v) => toggleFilter('Status', v)} />
                           )}
