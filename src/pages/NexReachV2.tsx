@@ -1724,7 +1724,7 @@ function WorkspaceScreen({
                         <Box style={{ border: '1px solid #a7850d', backgroundColor: '#fef7d6', borderRadius: 6, padding: '10px 14px' }}>
                           <Group gap={4} mb={6} align="center">
                             <Text style={{ fontSize: 13, color: '#a7850d' }}>&#9888;</Text>
-                            <Text size="xs" fw={600} style={{ color: '#242423' }}>RRs Needing Action</Text>
+                            <Text size="xs" fw={600} style={{ color: '#242423' }}>Requests Needing Action</Text>
                           </Group>
                           <Group gap={16}>
                             <Box>
@@ -1738,7 +1738,7 @@ function WorkspaceScreen({
                           </Group>
                         </Box>
                         <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
-                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>RRs Actioned</Text>
+                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>Requests Actioned</Text>
                           <Group gap={14}>
                             {[
                               'Scheduled', 'Progress Logged',
@@ -1760,7 +1760,7 @@ function WorkspaceScreen({
                         <Box style={{ border: '1px solid #a7850d', backgroundColor: '#fef7d6', borderRadius: 6, padding: '10px 14px' }}>
                           <Group gap={4} mb={6} align="center">
                             <Text style={{ fontSize: 13, color: '#a7850d' }}>&#9888;</Text>
-                            <Text size="xs" fw={600} style={{ color: '#242423' }}>{isEmrRemote || isInbound ? 'RRs Needing Action' : 'Requests Needing Action'}</Text>
+                            <Text size="xs" fw={600} style={{ color: '#242423' }}>Requests Needing Action</Text>
                           </Group>
                           <Group gap={16}>
                             <Box>
@@ -1777,7 +1777,7 @@ function WorkspaceScreen({
                         {/* Pipeline statuses */}
                         <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
                           <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>
-                            {isEmrRemote || isInbound ? 'RRs in Credential Pipeline' : 'Scheduling Pipeline'}
+                            {isEmrRemote || isInbound ? 'Requests in Credential Pipeline' : 'Scheduling Pipeline'}
                           </Text>
                           <Group gap={0} wrap="nowrap" style={{ overflowX: 'auto' }}>
                             {([
@@ -1804,9 +1804,9 @@ function WorkspaceScreen({
                           </Group>
                         </Box>
 
-                        {/* RRs Actioned */}
+                        {/* Requests Actioned */}
                         <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
-                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>RRs Actioned</Text>
+                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>Requests Actioned</Text>
                           <Group gap={14}>
                             {[...(isInbound ? ['Scheduled', 'Progress Logged', 'No Availability'] : []), 'In Research', 'Rerouted', 'Pended'].map((s) => (
                               <Box key={s}>
