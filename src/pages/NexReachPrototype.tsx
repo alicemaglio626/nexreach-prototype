@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Stack,
@@ -131,6 +131,14 @@ const SITE_ADDRESSES = [
 const UNBLOCKED_APPROVED_AMOUNT = 100;
 const UNBLOCKED_COUNT = 8; // first N rows are In Progress-Unblocked (PNP24 released, $100 approved)
 
+const ACTIVE_PENDS = [
+  { code: 'PNP24', label: 'Request Payment', count: 412, actionable: true },
+  { code: 'PNP5', label: 'Provider Capacity Restrictions', count: 23, actionable: false },
+  { code: 'PNP18', label: 'Post Commitment Refusal', count: 8, actionable: false },
+  { code: 'PNP1', label: 'Provider Not Responding', count: 15, actionable: false },
+  { code: 'PNP11', label: 'Member Record Not At Location', count: 6, actionable: false },
+];
+
 const PROVIDERS = [
   'BARNES, TAYLOR', 'CHEN, SARAH', 'PATEL, RAJ', 'WILLIAMS, JAMES', 'FOSTER, MARIA',
   'KIM, DAVID', 'NGUYEN, ANH', 'MORGAN, LISA', 'RIVERA, CARLOS', 'OKONKWO, ADAEZE',
@@ -144,6 +152,8 @@ const PROVIDER_TOTALS: Record<string, number> = Object.fromEntries(
   PROVIDERS.map((name, i) => [name, [80, 12, 5, 27, 6, 18, 45, 9, 33, 4, 15, 22, 8, 11, 38, 7, 26, 13, 50, 5, 19, 41, 6, 31, 8, 29, 14, 25, 7, 17][i]])
 );
 const TOTAL_PROVIDERS = 249; // narrative — actual mock data carries 30
+const METHOD_RR_TOTALS: Record<string, number> = { Offsite: 500, Onsite: 350 };
+const METHOD_ORDER = ['Offsite', 'Onsite'];
 
 const REQUEST_ROWS = PROVIDERS.flatMap((practitioner, providerIdx) =>
   Array.from({ length: 5 }, (_, i) => {
@@ -156,7 +166,7 @@ const REQUEST_ROWS = PROVIDERS.flatMap((practitioner, providerIdx) =>
       dob: `${String((flatIdx % 12) + 1).padStart(2, '0')}/${String((flatIdx % 28) + 1).padStart(2, '0')}/${1985 + (flatIdx % 15)}`,
       due: '4/1/2026',
       commit: '—',
-      status: flatIdx < UNBLOCKED_COUNT ? 'In Progress-Unblocked' : 'New',
+      status: 'Past Due',
       payment: '—',
       osRef: `87991820${9887 + flatIdx}`,
       practitioner,
@@ -1363,6 +1373,153 @@ function LandingScreen({
   );
 }
 
+// ─── Schedule Nudge Modal ────────────────────────────────────────────────────
+
+function ScheduleNudgeModal({ rrCount, isInbound, onDismiss, onStartScheduling }: {
+  rrCount: number; isInbound: boolean; onDismiss: () => void; onStartScheduling: () => void;
+}) {
+  return (
+    <ModalOverlay title="Ready to Schedule?" submitLabel="Start Scheduling" onClose={onDismiss} onSubmit={onStartScheduling} size={480}>
+      <Stack gap="md">
+        <Box style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 16px' }}>
+          <Group gap={8} align="center">
+            <IconCheck size={15} color="#1d4ed8" />
+            <Text size="sm" fw={600} style={{ color: '#1e40af' }}>2 members verified — compliance threshold met</Text>
+          </Group>
+        </Box>
+        <Text size="sm" style={{ color: '#4f4e4c', lineHeight: 1.6 }}>
+          You're ready to schedule all{' '}
+          <Text component="span" fw={700} style={{ color: '#242423' }}>{rrCount.toLocaleString()} record requests</Text>.
+          {isInbound && ' The scheduling flow will walk you through each retrieval method in sequence.'}
+        </Text>
+      </Stack>
+    </ModalOverlay>
+  );
+}
+
+// ─── Schedule Stepper Modal (inbound only) ────────────────────────────────────
+
+function ScheduleStepperModal({ methodSteps, onClose, onStepComplete, siteAccessType, onSiteAccessTypeChange, paymentInfo, onPaymentInfoChange }: {
+  methodSteps: string[];
+  onClose: () => void;
+  onStepComplete: (method: string, skipped: boolean) => void;
+  siteAccessType: string | null;
+  onSiteAccessTypeChange: (v: string) => void;
+  paymentInfo: PaymentInfo;
+  onPaymentInfoChange: (info: PaymentInfo) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [stepModalOpen, setStepModalOpen] = useState(false);
+
+  const currentMethod = methodSteps[step];
+  const totalSteps = methodSteps.length;
+  const isLast = step === totalSteps - 1;
+  const count = METHOD_RR_TOTALS[currentMethod] ?? 0;
+
+  const advanceStep = (skipped: boolean) => {
+    onStepComplete(currentMethod, skipped);
+    if (isLast) {
+      onClose();
+    } else {
+      setStep(s => s + 1);
+    }
+  };
+
+  const handleStepSubmit = () => {
+    setStepModalOpen(false);
+    advanceStep(false);
+  };
+
+  return (
+    <>
+      {/* Stepper backdrop — hidden when step modal is on top */}
+      {!stepModalOpen && <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 9990 }} />}
+
+      {/* Stepper shell */}
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', background: '#fff', borderRadius: 12, zIndex: 9991, width: 560, maxWidth: 'calc(100vw - 40px)', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e7e5df' }}>
+          <Group justify="space-between" align="flex-start" mb={14}>
+            <Text fw={400} size="xl">Schedule All Record Requests</Text>
+            <Text style={{ cursor: 'pointer', color: '#6b7280', fontSize: 20, lineHeight: 1 }} onClick={onClose}>×</Text>
+          </Group>
+          {/* Step progress */}
+          <Group gap={0} align="center">
+            {methodSteps.map((m, i) => (
+              <React.Fragment key={m}>
+                <Group gap={6} align="center">
+                  <div style={{
+                    width: 24, height: 24, borderRadius: 12, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 700,
+                    backgroundColor: i < step ? '#dcfce7' : i === step ? '#006ccf' : '#e7e5df',
+                    color: i < step ? '#166534' : i === step ? '#fff' : '#8a8985',
+                  }}>
+                    {i < step ? '✓' : i + 1}
+                  </div>
+                  <Text size="xs" fw={i === step ? 600 : 400} style={{ color: i === step ? '#242423' : '#8a8985', whiteSpace: 'nowrap' }}>{m}</Text>
+                </Group>
+                {i < methodSteps.length - 1 && <div style={{ flex: 1, height: 1, backgroundColor: '#e7e5df', margin: '0 8px', minWidth: 16 }} />}
+              </React.Fragment>
+            ))}
+          </Group>
+        </div>
+
+        {/* Info banner */}
+        <div style={{ backgroundColor: '#eff6ff', borderBottom: '1px solid #bfdbfe', padding: '10px 24px' }}>
+          <Group gap={8} align="center">
+            <IconInfoCircle size={15} color="#1d4ed8" />
+            <Text size="sm" fw={600} style={{ color: '#1e40af' }}>
+              Step {step + 1} of {totalSteps} — {currentMethod} · {count.toLocaleString()} Record Requests
+            </Text>
+          </Group>
+        </div>
+
+        {/* Step summary */}
+        <div style={{ padding: '20px 24px' }}>
+          <Text size="sm" style={{ color: '#4f4e4c', lineHeight: 1.6 }}>
+            {currentMethod === 'Offsite' && `Schedule ${count.toLocaleString()} Offsite record requests. You'll confirm payment details and commitment date.`}
+            {currentMethod === 'Onsite' && `Schedule ${count.toLocaleString()} Onsite record requests. The Onsite Scheduler will open to confirm appointment details.`}
+          </Text>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #e7e5df' }}>
+          <Group justify="space-between" align="center">
+            <Button intent="neutral" appearance="ghost" size="sm" onClick={() => advanceStep(true)}>
+              Skip {currentMethod}
+            </Button>
+            <Group gap={8}>
+              <Button intent="neutral" appearance="ghost" size="sm" onClick={onClose}>Cancel</Button>
+              <Button intent="prominent" appearance="solid" size="sm" onClick={() => setStepModalOpen(true)}>
+                Schedule {count.toLocaleString()} {currentMethod} RRs
+              </Button>
+            </Group>
+          </Group>
+        </div>
+      </div>
+
+      {/* Full scheduling modal for current step — floats on top of stepper */}
+      {stepModalOpen && currentMethod === 'Offsite' && (
+        <ScheduleModal
+          count={count}
+          unblockedCount={0}
+          onClose={() => setStepModalOpen(false)}
+          onSubmit={() => handleStepSubmit()}
+        />
+      )}
+      {stepModalOpen && currentMethod === 'Onsite' && (
+        <OnsiteScheduleModal
+          count={count}
+          onClose={() => setStepModalOpen(false)}
+          onSubmit={() => handleStepSubmit()}
+        />
+      )}
+    </>
+  );
+}
+
 // ─── Workspace Screen ────────────────────────────────────────────────────────
 
 function WorkspaceScreen({
@@ -1399,6 +1556,15 @@ function WorkspaceScreen({
   const [verifiedRows, setVerifiedRows] = useState<Set<string>>(new Set());
   const [expandedProviders, setExpandedProviders] = useState<Set<string>>(new Set());
   const [providersShown, setProvidersShown] = useState(10);
+  const [activePendsModalOpen, setActivePendsModalOpen] = useState(false);
+  const [scheduleNudgeOpen, setScheduleNudgeOpen] = useState(false);
+  const [scheduleStepperOpen, setScheduleStepperOpen] = useState(false);
+  const nudgeTriggeredRef = useRef(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<typeof requestRows | null>(null);
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'provider' | 'search'>('provider');
+  const [searchViewQuery, setSearchViewQuery] = useState('');
+  const [searchViewFilters, setSearchViewFilters] = useState<Record<string, Set<string>>>({});
 
   const TOTAL_RR_COUNT = 1247;
 
@@ -1409,6 +1575,13 @@ function WorkspaceScreen({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (verifiedRows.size >= 2 && !nudgeTriggeredRef.current && !scheduleStepperOpen && !activeAction) {
+      nudgeTriggeredRef.current = true;
+      setScheduleNudgeOpen(true);
+    }
+  }, [verifiedRows.size]);
 
   const toggleExpanded = (provider: string) => {
     setExpandedProviders(prev => {
@@ -1442,6 +1615,16 @@ function WorkspaceScreen({
 
   const resetFilters = () => setFilters({});
 
+  const toggleSearchViewFilter = (filterKey: string, value: string) => {
+    setSearchViewFilters(prev => {
+      const current = prev[filterKey] || new Set<string>();
+      const next = new Set(current);
+      if (next.has(value)) next.delete(value); else next.add(value);
+      return { ...prev, [filterKey]: next };
+    });
+  };
+  const resetSearchView = () => { setSearchViewQuery(''); setSearchViewFilters({}); };
+
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 4000);
@@ -1463,7 +1646,7 @@ function WorkspaceScreen({
   const filteredToSingleMethod = methodFilter && methodFilter.size === 1;
   const activeMethod = filteredToSingleMethod ? Array.from(methodFilter)[0] : null;
   const effectiveMethod = isInbound ? (activeMethod === 'EMRR' ? 'emr-remote' : activeMethod?.toLowerCase() || null) : retrievalMethod;
-  const canTakeGlobalAction = isInbound ? (isConnected && filteredToSingleMethod && activeMethod !== 'EMRR') : isConnected;
+  const canTakeGlobalAction = isConnected;
   const canTakeAction = isConnected;
 
   const toggleRow = (id: string) => {
@@ -1475,7 +1658,7 @@ function WorkspaceScreen({
     });
   };
 
-  const unactionedRows = requestRows.filter(r => (r.status === 'New' || r.status === 'In Progress-Unblocked') && !(isInbound && r.rowMethod === 'EMRR'));
+  const unactionedRows = requestRows.filter(r => (r.status === 'New' || r.status === 'Past Due' || r.status === 'In Progress-Unblocked') && !(isInbound && r.rowMethod === 'EMRR'));
 
   const toggleAll = () => {
     if (selectedRows.size === unactionedRows.length && unactionedRows.length > 0) {
@@ -1499,7 +1682,7 @@ function WorkspaceScreen({
     : { schedule: 'Record Requests Scheduled', research: 'Record Requests Sent to Research', pend: 'Record Requests Pended', reroute: 'Record Requests Rerouted' };
 
   // Apply action to rows (update status + commitment date for schedule)
-  const applyAction = (action: ActionType, global?: boolean, customStatus?: string, commitDate?: string, paymentRequired?: boolean) => {
+  const applyAction = (action: ActionType, global?: boolean, customStatus?: string, commitDate?: string, paymentRequired?: boolean, allowUndo = true) => {
     const statusMap: Record<ActionType, string> = isEmrrContext
       ? { schedule: 'Outreach In Progress', research: 'In Research', pend: 'Pended', reroute: 'Rerouted' }
       : { schedule: 'Scheduled', research: 'In Research', pend: 'Pended', reroute: 'Rerouted' };
@@ -1507,6 +1690,16 @@ function WorkspaceScreen({
     const targetIds = global ? new Set(requestRows.map(r => r.id)) : selectedRows;
 
     if (targetIds.size > 0) {
+      if (allowUndo) {
+        setUndoSnapshot([...requestRows]);
+        const count = global ? TOTAL_RR_COUNT : targetIds.size;
+        const baseLabel = `${count.toLocaleString()} record request${count === 1 ? '' : 's'} ${toastMessages[action].toLowerCase()}`;
+        const label = (action === 'schedule' && isInbound) ? `${baseLabel} · Onsite scheduling cannot be undone` : baseLabel;
+        setUndoLabel(label);
+      } else {
+        setUndoSnapshot(null);
+        setUndoLabel(null);
+      }
       setRequestRows(prev => prev.map(r =>
         targetIds.has(r.id) ? {
           ...r,
@@ -1782,183 +1975,249 @@ function WorkspaceScreen({
 
                   {/* Sample workspace */}
                   <Box>
-                    {/* Inventory at a glance — Total RRs hero + breakdowns */}
-                    <Flex gap={12} mb="lg" wrap="wrap" align="stretch">
-                      {/* Hero: Total RRs */}
-                      <Box style={{
-                        border: '1px solid #006ccf',
-                        backgroundColor: '#eaf5ff',
-                        borderRadius: 8,
-                        padding: '12px 20px',
-                        minWidth: 160,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                      }}>
-                        <Text size="xs" fw={600} style={{ color: '#006ccf', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Total Record Requests
-                        </Text>
-                        <Text style={{ fontSize: 30, fontWeight: 700, color: '#0b4a82', lineHeight: 1.1, marginTop: 2 }}>
-                          {TOTAL_RR_COUNT.toLocaleString()}
-                        </Text>
-                        <Text size="xs" style={{ color: '#1f5f9c', marginTop: 4 }}>
-                          across {TOTAL_PROVIDERS} providers
-                        </Text>
-                      </Box>
 
-                      {(retrievalMethod === 'offsite' || retrievalMethod === 'onsite') && !isInbound ? (
-                        <>
+                    {/* ── Inventory Overview ── */}
+                    {(() => {
+                      const uniquePlans = [...new Set(requestRows.map(r => r.plan))];
+                      const lastCall = CALL_HISTORY_ROWS[0];
+                      const showUnifiedCard = (retrievalMethod === 'offsite' || retrievalMethod === 'onsite' || isInbound);
+                      const gridCols = isInbound ? '1fr 1px 1fr 1px auto' : '1fr 1px 1fr 1px auto';
+                      return showUnifiedCard ? (
+                        <Box mb="lg" style={{ border: '1px solid #e7e5df', borderRadius: 8, overflow: 'hidden' }}>
+
+                          {/* Hero row — scope */}
+                          <Box style={{ backgroundColor: '#eaf5ff', padding: '14px 20px', borderBottom: '1px solid #c3dcf5' }}>
+                            <Group gap={0} align="baseline" wrap="nowrap">
+                              <Text style={{ fontSize: 28, fontWeight: 700, color: '#0b4a82', lineHeight: 1, marginRight: 10 }}>
+                                {TOTAL_RR_COUNT.toLocaleString()}
+                              </Text>
+                              <Text size="sm" fw={500} style={{ color: '#1f5f9c', marginRight: 16 }}>Record Requests</Text>
+                              <Text size="sm" style={{ color: '#4d8ab8', marginRight: 6 }}>·</Text>
+                              <Text size="sm" style={{ color: '#4d8ab8', marginRight: 16 }}>{TOTAL_PROVIDERS} providers</Text>
+                              <Text size="sm" style={{ color: '#4d8ab8', marginRight: 6 }}>·</Text>
+                              <Text size="sm" style={{ color: '#4d8ab8' }}>
+                                {uniquePlans.length === 1 ? uniquePlans[0] : `Multiple health plans (${uniquePlans.length})`}
+                              </Text>
+                            </Group>
+                          </Box>
+
+                          {/* Column breakdown */}
+                          <Box style={{ display: 'grid', gridTemplateColumns: gridCols, backgroundColor: '#fff' }}>
+
+                            {/* Needs Attention */}
+                            <Box style={{ padding: '12px 16px' }}>
+                              <Group gap={4} mb={10} align="center">
+                                <IconAlertTriangle size={13} color="#a7850d" />
+                                <Text size="xs" fw={600} style={{ color: '#a7850d', textTransform: 'uppercase', letterSpacing: 0.4 }}>Needs Attention</Text>
+                              </Group>
+                              <Group gap={24}>
+                                <Box>
+                                  <Text size="xs" style={{ color: '#6e6d6a' }}>Past Due</Text>
+                                  <Text size="md" fw={700} style={{ color: '#242423' }}>38</Text>
+                                </Box>
+                                <Box>
+                                  <Text size="xs" style={{ color: '#6e6d6a' }}>Unscheduled</Text>
+                                  <Text size="md" fw={700} style={{ color: '#242423' }}>781</Text>
+                                </Box>
+                              </Group>
+                            </Box>
+
+                            <Box style={{ backgroundColor: '#e7e5df' }} />
+
+                            {/* Pends */}
+                            <Box style={{ padding: '12px 16px' }}>
+                              {(() => {
+                                const actionable = ACTIVE_PENDS.filter(p => p.actionable);
+                                const blocked = ACTIVE_PENDS.filter(p => !p.actionable);
+                                const preview = [...actionable, ...blocked].slice(0, 3);
+                                const hasMore = ACTIVE_PENDS.length > 3;
+                                return (
+                                  <>
+                                    <Group justify="space-between" align="center" mb={10}>
+                                      <Text size="xs" fw={600} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.4 }}>Pends</Text>
+                                      {hasMore && (
+                                        <Text size="xs" fw={500} style={{ color: '#006ccf', cursor: 'pointer' }} onClick={() => setActivePendsModalOpen(true)}>
+                                          View All ({ACTIVE_PENDS.length})
+                                        </Text>
+                                      )}
+                                    </Group>
+                                    {ACTIVE_PENDS.length === 0 ? (
+                                      <Text size="sm" style={{ color: '#6e6d6a' }}>None</Text>
+                                    ) : (
+                                      <Group gap={0} align="flex-start">
+                                        {preview.filter(p => p.actionable).map(p => (
+                                          <Box key={p.code} style={{ paddingRight: 20 }}>
+                                            <Text size="xs" style={{ color: '#6e6d6a' }}>{p.code}</Text>
+                                            <Text size="md" fw={700} style={{ color: '#242423' }}>{p.count}</Text>
+                                            <Box mt={2} style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 6px', backgroundColor: '#dcfce7', borderRadius: 4 }}>
+                                              <Text size="xs" fw={600} style={{ color: '#15803d' }}>Released</Text>
+                                            </Box>
+                                          </Box>
+                                        ))}
+                                        {preview.some(p => p.actionable) && preview.some(p => !p.actionable) && (
+                                          <Box style={{ width: 1, backgroundColor: '#e7e5df', alignSelf: 'stretch', marginRight: 20 }} />
+                                        )}
+                                        <Group gap={20} align="flex-start">
+                                          {preview.filter(p => !p.actionable).map(p => (
+                                            <Box key={p.code}>
+                                              <Text size="xs" style={{ color: '#9ca3af' }}>{p.code}</Text>
+                                              <Text size="md" fw={700} style={{ color: '#6e6d6a' }}>{p.count}</Text>
+                                            </Box>
+                                          ))}
+                                        </Group>
+                                      </Group>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </Box>
+
+                            <Box style={{ backgroundColor: '#e7e5df' }} />
+
+                            {/* Credential Pipeline — inbound only, last column of top row */}
+                            {isInbound && (
+                              <Box style={{ padding: '12px 16px' }}>
+                                <Text size="xs" fw={600} mb={10} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.4 }}>Credential Pipeline</Text>
+                                <Group gap={20}>
+                                  {[
+                                    { label: 'Outreach In Prog', key: 'Outreach In Progress' },
+                                    { label: 'Credentialing In Prog', key: 'Credentialing In Progress' },
+                                    { label: 'Credentialing Invalid', key: 'Credentialing Invalid' },
+                                    { label: 'Awaiting Queued', key: 'Awaiting Queued' },
+                                    { label: 'Awaiting Assignment', key: 'Awaiting Assignment' },
+                                  ].map(s => (
+                                    <Box key={s.key}>
+                                      <Text size="xs" style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{s.label}</Text>
+                                      <Text size="md" fw={700} style={{ color: '#242423' }}>{statusCounts[s.key] || 0}</Text>
+                                    </Box>
+                                  ))}
+                                </Group>
+                              </Box>
+                            )}
+
+                            {/* Actioned — offsite only, stays in grid as last hugging column */}
+                            {!isInbound && (
+                              <Box style={{ padding: '12px 16px' }}>
+                                <Text size="xs" fw={600} mb={10} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.4 }}>Actioned</Text>
+                                <Group gap={20}>
+                                  {[['Scheduled', 12], ['Progress Saved', 0], ['In Research', 4], ['Rerouted', 0], ['Pended', 0]].map(([s, n]) => (
+                                    <Box key={s as string}>
+                                      <Text size="xs" style={{ color: '#6e6d6a' }}>{s}</Text>
+                                      <Text size="md" fw={700} style={{ color: '#242423' }}>{n as number}</Text>
+                                    </Box>
+                                  ))}
+                                </Group>
+                              </Box>
+                            )}
+                          </Box>
+
+                          {/* Actioned — inbound only, second row */}
+                          {isInbound && (
+                            <Box style={{ borderTop: '1px solid #e7e5df', padding: '12px 16px', backgroundColor: '#fff' }}>
+                              <Text size="xs" fw={600} mb={10} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.4 }}>Actioned</Text>
+                              <Group gap={20}>
+                                {[['Scheduled', statusCounts['Scheduled'] || 12], ['Progress Saved', statusCounts['Progress Logged'] || 0], ['No Availability', statusCounts['No Availability'] || 0], ['In Research', statusCounts['In Research'] || 4], ['Rerouted', statusCounts['Rerouted'] || 0], ['Pended', statusCounts['Pended'] || 0]].map(([s, n]) => (
+                                  <Box key={s as string}>
+                                    <Text size="xs" style={{ color: '#6e6d6a' }}>{s}</Text>
+                                    <Text size="md" fw={700} style={{ color: '#242423' }}>{n as number}</Text>
+                                  </Box>
+                                ))}
+                              </Group>
+                            </Box>
+                          )}
+
+                          {/* Footer — last outreach */}
+                          <Box style={{ backgroundColor: '#f7f6f4', borderTop: '1px solid #e7e5df', padding: '8px 20px' }}>
+                            <Text size="xs" style={{ color: '#6e6d6a' }}>
+                              Last outreach: {lastCall.timestamp.split(',')[0]} · {lastCall.outcome.split('\n')[0]} · {lastCall.agent}
+                            </Text>
+                          </Box>
+
+                        </Box>
+                      ) : (
+                        /* EMRR / Inbound — existing layout unchanged */
+                        <Flex gap={12} mb="lg" wrap="wrap" align="stretch">
+                          <Box style={{ border: '1px solid #006ccf', backgroundColor: '#eaf5ff', borderRadius: 8, padding: '12px 20px', minWidth: 160, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <Text size="xs" fw={600} style={{ color: '#006ccf', textTransform: 'uppercase', letterSpacing: 0.5 }}>Total Record Requests</Text>
+                            <Text style={{ fontSize: 30, fontWeight: 700, color: '#0b4a82', lineHeight: 1.1, marginTop: 2 }}>{TOTAL_RR_COUNT.toLocaleString()}</Text>
+                            <Text size="xs" style={{ color: '#1f5f9c', marginTop: 4 }}>across {TOTAL_PROVIDERS} providers</Text>
+                          </Box>
                           <Box style={{ border: '1px solid #a7850d', backgroundColor: '#fef7d6', borderRadius: 6, padding: '10px 14px' }}>
                             <Group gap={4} mb={6} align="center">
                               <Text style={{ fontSize: 13, color: '#a7850d' }}>&#9888;</Text>
                               <Text size="xs" fw={600} style={{ color: '#242423' }}>RRs Needing Action</Text>
                             </Group>
                             <Group gap={16}>
-                              <Box>
-                                <Text size="xs" style={{ color: '#6e6d6a' }}>Past Due</Text>
-                                <Text size="sm" fw={700} style={{ color: '#242423' }}>38</Text>
-                              </Box>
-                              <Box>
-                                <Text size="xs" style={{ color: '#6e6d6a' }}>Unscheduled</Text>
-                                <Text size="sm" fw={700} style={{ color: '#242423' }}>781</Text>
-                              </Box>
-                              <Box>
-                                <Text size="xs" style={{ color: '#6e6d6a' }}>Unblocked</Text>
-                                <Text size="sm" fw={700} style={{ color: '#242423' }}>412</Text>
-                              </Box>
+                              <Box><Text size="xs" style={{ color: '#6e6d6a' }}>Past Due</Text><Text size="sm" fw={700} style={{ color: '#242423' }}>{pastDueCount}</Text></Box>
+                              <Box><Text size="xs" style={{ color: '#6e6d6a' }}>New</Text><Text size="sm" fw={700} style={{ color: '#242423' }}>{needsActionCount}</Text></Box>
+                            </Group>
+                          </Box>
+                          <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
+                            <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>{isEmrRemote || isInbound ? 'RRs in Credential Pipeline' : 'Scheduling Pipeline'}</Text>
+                            <Group gap={0} wrap="nowrap" style={{ overflowX: 'auto' }}>
+                              {[{ label: 'Outreach In Prog', full: 'Outreach In Progress' }, { label: 'Credentialing In Prog', full: 'Credentialing In Progress' }, { label: 'Awaiting Queued', full: 'Awaiting Queued' }, { label: 'Awaiting Assignment', full: 'Awaiting Assignment' }].map(s => (
+                                <Box key={s.label} style={{ padding: '0 8px' }}>
+                                  <Text size="xs" mb={2} style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{s.label}</Text>
+                                  <Text size="sm" fw={700} style={{ color: '#242423' }}>{statusCounts[s.full] || 0}</Text>
+                                </Box>
+                              ))}
                             </Group>
                           </Box>
                           <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
                             <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>RRs Actioned</Text>
                             <Group gap={14}>
-                              {(retrievalMethod === 'onsite'
-                                ? [['Scheduled', 12], ['Progress Logged', 0], ['No Availability', 0], ['In Research', 4], ['Rerouted', 0], ['Pended', 0]]
-                                : [['Scheduled', 12], ['Progress Logged', 0], ['In Research', 4], ['Rerouted', 0], ['Pended', 0]]
-                              ).map(([s, n]) => (
-                                <Box key={s as string}>
-                                  <Text size="xs" style={{ color: '#6e6d6a' }}>{s}</Text>
-                                  <Text size="sm" fw={700} style={{ color: '#242423' }}>{n as number}</Text>
-                                </Box>
+                              {[...(isInbound ? ['Scheduled', 'Progress Logged', 'No Availability'] : []), 'In Research', 'Rerouted', 'Pended'].map(s => (
+                                <Box key={s}><Text size="xs" style={{ color: '#6e6d6a' }}>{s}</Text><Text size="sm" fw={700} style={{ color: '#242423' }}>{statusCounts[s] || 0}</Text></Box>
                               ))}
                             </Group>
                           </Box>
-                        </>
-                      ) : (
-                      /* EMRR, Inbound: three-card layout */
-                      <>
-                        {/* Needs Action */}
-                        <Box style={{ border: '1px solid #a7850d', backgroundColor: '#fef7d6', borderRadius: 6, padding: '10px 14px' }}>
-                          <Group gap={4} mb={6} align="center">
-                            <Text style={{ fontSize: 13, color: '#a7850d' }}>&#9888;</Text>
-                            <Text size="xs" fw={600} style={{ color: '#242423' }}>{isEmrRemote || isInbound ? 'RRs Needing Action' : 'Requests Needing Action'}</Text>
-                          </Group>
-                          <Group gap={16}>
-                            <Box>
-                              <Text size="xs" style={{ color: '#6e6d6a' }}>Past Due</Text>
-                              <Text size="sm" fw={700} style={{ color: '#242423' }}>{pastDueCount}</Text>
-                            </Box>
-                            <Box>
-                              <Text size="xs" style={{ color: '#6e6d6a' }}>New</Text>
-                              <Text size="sm" fw={700} style={{ color: '#242423' }}>{needsActionCount}</Text>
-                            </Box>
-                          </Group>
+                        </Flex>
+                      );
+                    })()}
+
+                    {/* View toggle */}
+                    <Group gap={0} mb="md" style={{ border: '1px solid #e7e5df', borderRadius: 6, overflow: 'hidden', alignSelf: 'flex-start', display: 'inline-flex' }}>
+                      {(['provider', 'search'] as const).map((mode, i) => (
+                        <Box
+                          key={mode}
+                          onClick={() => setViewMode(mode)}
+                          style={{
+                            padding: '6px 16px',
+                            cursor: 'pointer',
+                            backgroundColor: viewMode === mode ? '#242423' : 'transparent',
+                            color: viewMode === mode ? '#fff' : '#4f4e4c',
+                            fontSize: 14,
+                            fontWeight: 500,
+                            userSelect: 'none',
+                            transition: 'all 0.15s',
+                            borderRight: i === 0 ? '1px solid #e7e5df' : undefined,
+                          }}
+                        >
+                          {mode === 'provider' ? 'Provider View' : 'Search & Filter'}
                         </Box>
+                      ))}
+                    </Group>
 
-                        {/* Pipeline statuses */}
-                        <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
-                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>
-                            {isEmrRemote || isInbound ? 'RRs in Credential Pipeline' : 'Scheduling Pipeline'}
-                          </Text>
-                          <Group gap={0} wrap="nowrap" style={{ overflowX: 'auto' }}>
-                            {([
-                                { label: 'Outreach In Prog', color: '#006ccf' },
-                                { label: 'Credentialing In Prog', color: '#7c3aed' },
-                                { label: 'Awaiting Queued', color: '#d97706' },
-                                { label: 'Awaiting Assignment', color: '#059669' },
-                            ]).map((s) => {
-                              const fullName: Record<string, string> = {
-                                'Outreach In Prog': 'Outreach In Progress',
-                                'Credentialing In Prog': 'Credentialing In Progress',
-                              };
-                              const countKey = fullName[s.label] || s.label;
-                              return (
-                                <Box key={s.label} style={{ display: 'flex', alignItems: 'center' }}>
-                                  <Box style={{ padding: '0 8px' }}>
-                                    <Text size="xs" mb={2} style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{s.label}</Text>
-                                    <Text size="sm" fw={700} style={{ color: '#242423' }}>{statusCounts[countKey] || 0}</Text>
-                                  </Box>
-                                </Box>
-                              );
-                            })}
-                          </Group>
-                        </Box>
-
-                        {/* RRs Actioned */}
-                        <Box style={{ border: '1px solid #e7e5df', borderRadius: 6, padding: '10px 14px' }}>
-                          <Text size="xs" fw={600} mb={6} style={{ color: '#242423' }}>RRs Actioned</Text>
-                          <Group gap={14}>
-                            {[...(isInbound ? ['Scheduled', 'Progress Logged', 'No Availability'] : []), 'In Research', 'Rerouted', 'Pended'].map((s) => (
-                              <Box key={s}>
-                                <Text size="xs" style={{ color: '#6e6d6a' }}>{s}</Text>
-                                <Text size="sm" fw={700} style={{ color: '#242423' }}>{statusCounts[s] || 0}</Text>
-                              </Box>
-                            ))}
-                          </Group>
-                        </Box>
-                      </>
-                    )}
-                    </Flex>
-
-                    {/* Inventory Callouts — slices of the inventory worth knowing about, each with a scoped action */}
-                    <Box mb="lg">
-                      <Text size="xs" fw={600} mb={8} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Inventory Callouts
-                      </Text>
-                      <Stack gap={6}>
-                        {[
-                          {
-                            id: 'pend24-approved',
-                            label: 'PEND24 — Approved at $100/chart',
-                            count: 412,
-                            note: 'Client released payment · ready to schedule',
-                            actionLabel: 'Schedule',
-                            actionType: 'schedule' as ActionType,
-                          },
-                        ].map((c) => (
-                          <Box key={c.id} style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            padding: '10px 14px',
-                            border: '1px solid #e7e5df',
-                            borderRadius: 6,
-                            backgroundColor: '#fff',
-                          }}>
-                            <Group gap={14} align="center">
-                              <Text fw={700} style={{ fontSize: 16, color: '#242423', minWidth: 44 }}>
-                                {c.count.toLocaleString()}
-                              </Text>
-                              <Box>
-                                <Text size="sm" fw={500} style={{ color: '#242423', lineHeight: 1.3 }}>{c.label}</Text>
-                                <Text size="xs" style={{ color: '#6e6d6a', marginTop: 1 }}>{c.note}</Text>
-                              </Box>
-                            </Group>
-                          </Box>
-                        ))}
-                      </Stack>
-                    </Box>
-
-                    {/* Search — for finding a specific RR by member, MRN, etc. */}
-                    <Box mb="md" style={{ width: 300 }}>
-                      <Box style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #8a8985', borderRadius: 6, padding: '6px 12px', paddingRight: 8, backgroundColor: '#fff' }}>
-                        <input placeholder="Search by provider, member, MRN…" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ border: 'none', outline: 'none', fontSize: 14, width: '100%', color: '#4f4e4c', background: 'transparent', fontFamily: 'DM Sans, sans-serif' }} />
-                        <IconSearch size={16} color="#6e6d6a" style={{ flexShrink: 0 }} />
+                    {/* Undo banner */}
+                    {undoLabel && (
+                      <Box mb="sm" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px' }}>
+                        <Group gap={8} align="center">
+                          <IconCheck size={15} color="#166534" />
+                          <Text size="sm" fw={600} style={{ color: '#166534' }}>{undoLabel}</Text>
+                        </Group>
+                        <Button intent="neutral" appearance="ghost" size="xs" onClick={() => { if (undoSnapshot) { setRequestRows(undoSnapshot); setUndoSnapshot(null); setUndoLabel(null); } }}>
+                          Undo
+                        </Button>
                       </Box>
-                    </Box>
+                    )}
 
+                    {viewMode === 'provider' ? (
+                    /* ── PROVIDER VIEW ── */
+                    <>
                     {/* Request table */}
-                    <Box style={{ overflowX: 'auto', border: '1px solid #e7e5df', borderRadius: 6 }}>
+                    <Box style={{ overflowX: 'auto', overflowY: 'clip', border: '1px solid #e7e5df', borderRadius: 6 }}>
                         <Table highlightOnHover style={{ minWidth: 1500, borderCollapse: 'collapse' }}>
-                          <Table.Thead>
+                          <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f7f6f4' }}>
                             <Table.Tr style={{ backgroundColor: '#f7f6f4', borderBottom: '1px solid #e7e5df' }}>
                               <Table.Th style={{ padding: '8px', width: 150, minWidth: 150 }}></Table.Th>
                               <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Request ID</Text></Table.Th>
@@ -2004,13 +2263,13 @@ function WorkspaceScreen({
                                             style={{ transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.15s' }}
                                           />
                                           <Text size="sm" fw={700} style={{ color: '#242423', whiteSpace: 'nowrap' }}>{provider}</Text>
-                                          <Text size="xs" style={{ color: '#4f4e4c', whiteSpace: 'nowrap' }}>{rrs.length} / {totalForProvider} Record Requests</Text>
+                                          <Text size="xs" style={{ color: '#4f4e4c', whiteSpace: 'nowrap' }}>{totalForProvider} Record Requests</Text>
                                         </Group>
                                         <Group gap={6} wrap="nowrap" align="center">
                                           {allVerified ? (
                                             <Group gap={4} align="center" wrap="nowrap" style={{ cursor: 'pointer' }} onClick={() => toggleVerifyProvider(rrIds)}>
                                               <IconCheck size={14} color="#16a34a" />
-                                              <Text size="sm" fw={500} style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>Provider group verified</Text>
+                                              <Text size="sm" fw={500} style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>All {totalForProvider} verified</Text>
                                             </Group>
                                           ) : (
                                             <Button
@@ -2019,7 +2278,7 @@ function WorkspaceScreen({
                                               size="xs"
                                               onClick={() => toggleVerifyProvider(rrIds)}
                                             >
-                                              Verify provider group
+                                              Verify All ({totalForProvider})
                                             </Button>
                                           )}
                                           <Button
@@ -2027,9 +2286,13 @@ function WorkspaceScreen({
                                             appearance="outline"
                                             size="xs"
                                             disabled={!canTakeAction}
-                                            onClick={() => applyGlobalAction('research')}
+                                            onClick={() => {
+                                              setSelectedRows(new Set(rrIds));
+                                              setActionScope('selected');
+                                              setActiveAction('research');
+                                            }}
                                           >
-                                            Send to research
+                                            Send All to Research ({totalForProvider})
                                           </Button>
                                         </Group>
                                       </Group>
@@ -2039,36 +2302,49 @@ function WorkspaceScreen({
 
                                 const detailRows = visibleRRs.map((row) => {
                                   const isVerified = verifiedRows.has(row.id);
+                                  const isActioned = !['New', 'Past Due', 'In Progress-Unblocked'].includes(row.status);
+                                  const canUndoRow = isActioned && row.rowMethod !== 'Onsite';
                                   return (
                                     <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e7e5df' }}>
                                       <Table.Td style={{ padding: '8px', width: 150, minWidth: 150 }}>
-                                        <Stack gap={2} align="flex-start">
-                                          {isVerified ? (
-                                            <Group gap={4} align="center" wrap="nowrap" style={{ cursor: 'pointer' }} onClick={() => toggleVerified(row.id)}>
-                                              <IconCheck size={14} color="#16a34a" />
-                                              <Text size="sm" fw={500} style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>Member verified</Text>
-                                            </Group>
-                                          ) : (
-                                            <Button intent="prominent" appearance="ghost" size="xs" onClick={() => toggleVerified(row.id)}>
-                                              <IconCheck size={12} style={{ marginRight: 4 }} />
-                                              Verify member
+                                        {isActioned ? (
+                                          canUndoRow ? (
+                                            <IconArrowBackUp
+                                              size={16}
+                                              color="#8a8985"
+                                              style={{ cursor: 'pointer' }}
+                                              onClick={() => setRequestRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'Past Due', commit: '—', payment: '—' } : r))}
+                                            />
+                                          ) : null
+                                        ) : (
+                                          <Stack gap={2} align="flex-start">
+                                            {isVerified ? (
+                                              <Group gap={4} align="center" wrap="nowrap" style={{ cursor: 'pointer' }} onClick={() => toggleVerified(row.id)}>
+                                                <IconCheck size={14} color="#16a34a" />
+                                                <Text size="sm" fw={500} style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>Member verified</Text>
+                                              </Group>
+                                            ) : (
+                                              <Button intent="prominent" appearance="ghost" size="xs" onClick={() => toggleVerified(row.id)}>
+                                                <IconCheck size={12} style={{ marginRight: 4 }} />
+                                                Verify Member
+                                              </Button>
+                                            )}
+                                            <Button
+                                              intent="prominent"
+                                              appearance="ghost"
+                                              size="xs"
+                                              disabled={!canTakeAction}
+                                              onClick={() => {
+                                                setSelectedRows(new Set([row.id]));
+                                                setActionScope('selected');
+                                                setActiveAction('research');
+                                              }}
+                                            >
+                                              <IconArrowRight size={12} style={{ marginRight: 4 }} />
+                                              Send to Research
                                             </Button>
-                                          )}
-                                          <Button
-                                            intent="prominent"
-                                            appearance="ghost"
-                                            size="xs"
-                                            disabled={!canTakeAction}
-                                            onClick={() => {
-                                              setSelectedRows(new Set([row.id]));
-                                              setActionScope('selected');
-                                              setActiveAction('research');
-                                            }}
-                                          >
-                                            <IconArrowRight size={12} style={{ marginRight: 4 }} />
-                                            Send to research
-                                          </Button>
-                                        </Stack>
+                                          </Stack>
+                                        )}
                                       </Table.Td>
                                       <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.id}</Text></Table.Td>
                                       {isInbound && <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.rowMethod}</Text></Table.Td>}
@@ -2153,12 +2429,193 @@ function WorkspaceScreen({
                         size="sm"
                         onClick={() => setProvidersShown(s => s + 10)}
                       >
-                        Load 10 more providers
+                        Load 10 More Providers
                       </Button>
                       <Text size="xs" c="dimmed">
                         Showing {Math.min(providersShown, PROVIDERS.length)} of {TOTAL_PROVIDERS} providers
                       </Text>
                     </Box>
+                    </>
+                    ) : (
+                    /* ── SEARCH & FILTER VIEW ── */
+                    <>
+                      {/* Search + filter pills */}
+                      <Group gap={8} mb="md" wrap="wrap" align="center">
+                        <Box style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid #8a8985', borderRadius: 6, padding: '6px 12px', paddingRight: 8, backgroundColor: '#fff', width: 340 }}>
+                          <input
+                            placeholder="Search by member name, DOB, request ID…"
+                            value={searchViewQuery}
+                            onChange={(e) => setSearchViewQuery(e.target.value)}
+                            style={{ border: 'none', outline: 'none', fontSize: 14, width: '100%', color: '#4f4e4c', background: 'transparent', fontFamily: 'DM Sans, sans-serif' }}
+                          />
+                          <IconSearch size={16} color="#6e6d6a" style={{ flexShrink: 0 }} />
+                        </Box>
+                        <FilterPill label="Health Plan" options={['Aetna', 'Cigna', 'UnitedHealthcare', 'Humana']} selected={searchViewFilters['Health Plan']} onToggle={(opt) => toggleSearchViewFilter('Health Plan', opt)} />
+                        <FilterPill label="Status" options={['Past Due', 'New', 'In Progress-Unblocked', 'Scheduled', 'In Research', 'Pended', 'Rerouted']} selected={searchViewFilters['Status']} onToggle={(opt) => toggleSearchViewFilter('Status', opt)} />
+                        {isInbound && <FilterPill label="Retrieval Method" options={['Offsite', 'Onsite', 'EMRR']} selected={searchViewFilters['Retrieval Method']} onToggle={(opt) => toggleSearchViewFilter('Retrieval Method', opt)} />}
+                        <FilterPill label="Provider" options={PROVIDERS} selected={searchViewFilters['Provider']} onToggle={(opt) => toggleSearchViewFilter('Provider', opt)} />
+                        {(searchViewQuery || Object.values(searchViewFilters).some(s => s.size > 0)) && (
+                          <Button intent="neutral" appearance="ghost" size="xs" onClick={resetSearchView}>Clear All</Button>
+                        )}
+                      </Group>
+
+                      {(() => {
+                        const isActive = searchViewQuery.trim() !== '' || Object.values(searchViewFilters).some(s => s.size > 0);
+
+                        if (!isActive) {
+                          return (
+                            <Box style={{ border: '1px solid #e7e5df', borderRadius: 8, padding: '60px 32px', textAlign: 'center', backgroundColor: '#fafaf7' }}>
+                              <IconSearch size={32} color="#c7c5bf" style={{ marginBottom: 12 }} />
+                              <Text fw={600} style={{ color: '#4f4e4c', marginBottom: 6 }}>Search or filter to find record requests</Text>
+                              <Text size="sm" style={{ color: '#6e6d6a', maxWidth: 380, margin: '0 auto' }}>
+                                Use the filters above to surface a specific subset of charts. Results load on demand — not pre-loaded.
+                              </Text>
+                            </Box>
+                          );
+                        }
+
+                        const svRows = requestRows.filter(row => {
+                          if (searchViewQuery.trim()) {
+                            const q = searchViewQuery.toLowerCase();
+                            if (!(row.id.includes(q) || row.member.toLowerCase().includes(q) || row.plan.toLowerCase().includes(q) || row.practitioner.toLowerCase().includes(q) || row.dob.includes(q))) return false;
+                          }
+                          const hpf = searchViewFilters['Health Plan'];
+                          if (hpf && hpf.size > 0 && !hpf.has(row.plan)) return false;
+                          const stf = searchViewFilters['Status'];
+                          if (stf && stf.size > 0 && !stf.has(row.status)) return false;
+                          const rmf = searchViewFilters['Retrieval Method'];
+                          if (rmf && rmf.size > 0 && !rmf.has(row.rowMethod)) return false;
+                          const pvf = searchViewFilters['Provider'];
+                          if (pvf && pvf.size > 0 && !pvf.has(row.practitioner)) return false;
+                          return true;
+                        });
+
+                        const svUnactioned = svRows.filter(r => ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status));
+                        const svAllSelected = svUnactioned.length > 0 && svUnactioned.every(r => selectedRows.has(r.id));
+                        const svToggleAll = () => {
+                          if (svAllSelected) {
+                            setSelectedRows(prev => { const next = new Set(prev); svUnactioned.forEach(r => next.delete(r.id)); return next; });
+                          } else {
+                            setSelectedRows(prev => { const next = new Set(prev); svUnactioned.forEach(r => next.add(r.id)); return next; });
+                          }
+                        };
+
+                        return (
+                          <>
+                            <Group justify="space-between" align="center" mb="xs">
+                              <Text size="sm" style={{ color: '#6e6d6a' }}>{svRows.length} record request{svRows.length !== 1 ? 's' : ''} found</Text>
+                              {selectedRows.size > 0 && (
+                                <Group gap={8}>
+                                  <Text size="sm" fw={500} style={{ color: '#242423' }}>{selectedRows.size} selected</Text>
+                                  <Button intent="prominent" appearance="outline" size="xs" disabled={!canTakeAction} onClick={() => { setActionScope('selected'); setActiveAction('schedule'); }}>Schedule</Button>
+                                  <Button intent="neutral" appearance="outline" size="xs" disabled={!canTakeAction} onClick={() => { setActionScope('selected'); setActiveAction('research'); }}>Send to Research</Button>
+                                  <Button intent="neutral" appearance="ghost" size="xs" onClick={() => setSelectedRows(new Set())}>Clear</Button>
+                                </Group>
+                              )}
+                            </Group>
+                            <Box style={{ overflowX: 'auto', overflowY: 'clip', border: '1px solid #e7e5df', borderRadius: 6 }}>
+                              <Table highlightOnHover style={{ minWidth: 1600, borderCollapse: 'collapse' }}>
+                                <Table.Thead style={{ position: 'sticky', top: 0, zIndex: 2, backgroundColor: '#f7f6f4' }}>
+                                  <Table.Tr style={{ backgroundColor: '#f7f6f4', borderBottom: '1px solid #e7e5df' }}>
+                                    <Table.Th style={{ padding: '8px', width: 40 }}>
+                                      <MantineCheckbox checked={svAllSelected} indeterminate={selectedRows.size > 0 && !svAllSelected} onChange={svToggleAll} size="sm" />
+                                    </Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Request ID</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Provider</Text></Table.Th>
+                                    {isInbound && <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Retrieval Method</Text></Table.Th>}
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Health Plan</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Member Name</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Member DOB</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>SDOS</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Project Due Date</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Commitment Date</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Status</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Payment Status</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>SLOC</Text></Table.Th>
+                                    <Table.Th style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}><Text size="sm" fw={500} style={{ color: '#4f4e4c' }}>Site</Text></Table.Th>
+                                  </Table.Tr>
+                                </Table.Thead>
+                                <Table.Tbody style={{ opacity: canTakeAction ? 1 : 0.5, pointerEvents: canTakeAction ? 'auto' : 'none' }}>
+                                  {svRows.map(row => {
+                                    const isActioned = !['New', 'Past Due', 'In Progress-Unblocked'].includes(row.status);
+                                    const canUndoRow = isActioned && row.rowMethod !== 'Onsite';
+                                    const isSelected = selectedRows.has(row.id);
+                                    return (
+                                      <Table.Tr key={row.id} style={{ borderBottom: '1px solid #e7e5df', backgroundColor: isSelected ? '#f0f7ff' : undefined }}>
+                                        <Table.Td style={{ padding: '8px', width: 40 }}>
+                                          {isActioned ? (
+                                            canUndoRow ? (
+                                              <IconArrowBackUp size={16} color="#8a8985" style={{ cursor: 'pointer' }}
+                                                onClick={() => setRequestRows(prev => prev.map(r => r.id === row.id ? { ...r, status: 'Past Due', commit: '—', payment: '—' } : r))}
+                                              />
+                                            ) : null
+                                          ) : (
+                                            <MantineCheckbox checked={isSelected} onChange={() => toggleRow(row.id)} size="sm" />
+                                          )}
+                                        </Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.id}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231', whiteSpace: 'nowrap' }}>{row.practitioner}</Text></Table.Td>
+                                        {isInbound && <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.rowMethod}</Text></Table.Td>}
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.plan}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ whiteSpace: 'nowrap', color: '#333231' }}>{row.member}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.dob}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}>
+                                          <Text size="sm" style={{ color: '#333231', lineHeight: 1.4 }}>
+                                            {row.sdos.split('-').map((date, i) => (
+                                              <span key={i} style={{ display: 'block', whiteSpace: 'nowrap' }}>{i === 0 ? `${date}–` : date}</span>
+                                            ))}
+                                          </Text>
+                                        </Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.due}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.commit}</Text></Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}>
+                                          {row.status === 'In Progress-Unblocked' ? (
+                                            <Group gap={4} align="center" wrap="nowrap">
+                                              <Text size="sm" style={{ color: '#333231', whiteSpace: 'nowrap' }}>In Progress-Unblocked</Text>
+                                              <Tooltip label={`Approved Amount: $${UNBLOCKED_APPROVED_AMOUNT}`} position="top" withArrow styles={{ tooltip: { backgroundColor: '#242423', color: '#fff', fontSize: 13, fontWeight: 500, padding: '6px 12px', borderRadius: 1000 }, arrow: { backgroundColor: '#242423' } }}>
+                                                <IconInfoCircle size={15} color="#006ccf" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
+                                              </Tooltip>
+                                            </Group>
+                                          ) : (
+                                            <Text size="sm" style={{ color: '#333231' }}>{row.status}</Text>
+                                          )}
+                                        </Table.Td>
+                                        <Table.Td style={{ padding: '8px' }}><Text size="sm" style={{ color: '#333231' }}>{row.payment}</Text></Table.Td>
+                                        {[row.sloc, row.site].map((addr, ci) => {
+                                          const parts = addr.split(',').map(p => p.trim());
+                                          let lines: string[];
+                                          if (parts.length >= 4) {
+                                            const stateZip = parts[3].trim().split(' ');
+                                            lines = [`${parts[0]}, ${parts[1]}`, `${parts[2]}, ${stateZip[0]}`, stateZip.slice(1).join(' ')];
+                                          } else { lines = parts; }
+                                          const needsTooltip = addr.length > 45;
+                                          const fullAddress = lines.join('\n');
+                                          const content = (
+                                            <div style={{ fontSize: 14, color: '#333231', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', whiteSpace: 'pre-line' }}>
+                                              {fullAddress}
+                                            </div>
+                                          );
+                                          return (
+                                            <Table.Td key={ci} style={{ padding: '8px', width: '160px', minWidth: '160px', maxWidth: '160px' }}>
+                                              {needsTooltip ? (
+                                                <Tooltip label={<span style={{ whiteSpace: 'pre-line' }}>{fullAddress}</span>} position="bottom" withArrow>
+                                                  <div style={{ cursor: 'default' }}>{content}</div>
+                                                </Tooltip>
+                                              ) : content}
+                                            </Table.Td>
+                                          );
+                                        })}
+                                      </Table.Tr>
+                                    );
+                                  })}
+                                </Table.Tbody>
+                              </Table>
+                            </Box>
+                          </>
+                        );
+                      })()}
+                    </>
+                    )}
 
                   </Box>
 
@@ -2176,19 +2633,14 @@ function WorkspaceScreen({
                           Apply to all <Text component="span" fw={700} style={{ color: '#242423' }}>{TOTAL_RR_COUNT.toLocaleString()}</Text> record requests
                         </Text>
                       </Group>
-                      <Box style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '4px 10px',
-                        borderRadius: 999,
-                        backgroundColor: verifiedRows.size === 0 ? '#fef7d6' : '#dcfce7',
-                        border: `1px solid ${verifiedRows.size === 0 ? '#e6c84a' : '#86efac'}`,
-                      }}>
-                        <Text size="xs" fw={600} style={{ color: verifiedRows.size === 0 ? '#7a5f0a' : '#166534' }}>
-                          {verifiedRows.size === 0
-                            ? `Verify members to enable`
-                            : `${verifiedRows.size} record request${verifiedRows.size === 1 ? '' : 's'} verified`}
-                        </Text>
-                      </Box>
+                      {verifiedRows.size > 0 && (
+                        <Group gap={4} align="center">
+                          <IconCheck size={13} color="#166534" />
+                          <Text size="xs" fw={600} style={{ color: '#166534' }}>
+                            {verifiedRows.size} member{verifiedRows.size === 1 ? '' : 's'} verified
+                          </Text>
+                        </Group>
+                      )}
                     </Group>
                     <Group gap="sm" wrap="wrap" mt={16}>
                       {((!isInbound && isEmrRemote)
@@ -2201,7 +2653,13 @@ function WorkspaceScreen({
                           appearance={i === 0 ? 'solid' : 'outline'}
                           size="md"
                           disabled={!canTakeGlobalAction}
-                          onClick={() => applyGlobalAction(action)}
+                          onClick={() => {
+                            if (action === 'schedule' && isInbound) {
+                              setScheduleStepperOpen(true);
+                            } else {
+                              applyGlobalAction(action);
+                            }
+                          }}
                         >
                           {label}
                         </Button>
@@ -2329,7 +2787,7 @@ function WorkspaceScreen({
             <Box style={{ padding: '12px 20px', borderBottom: '1px solid #e7e5df', flexShrink: 0 }}>
               <Textarea placeholder="Add a note for the next agent..." rows={2} value={drawerDraft} onChange={(e) => setDrawerDraft(e.currentTarget.value)} styles={{ input: { fontSize: 13 } }} />
               <Group justify="flex-end" gap="xs" mt="xs">
-                <Button intent="prominent" appearance="solid" size="xs" onClick={() => { if (drawerDraft.trim()) { addNote(drawerDraft.trim()); setDrawerDraft(''); } }}>Save note</Button>
+                <Button intent="prominent" appearance="solid" size="xs" onClick={() => { if (drawerDraft.trim()) { addNote(drawerDraft.trim()); setDrawerDraft(''); } }}>Save Note</Button>
               </Group>
             </Box>
             {/* Notes list */}
@@ -2351,12 +2809,44 @@ function WorkspaceScreen({
         )}
       </Box>
 
+      {/* ── Schedule Nudge Modal ── */}
+      {scheduleNudgeOpen && (
+        <ScheduleNudgeModal
+          rrCount={TOTAL_RR_COUNT}
+          isInbound={isInbound}
+          onDismiss={() => setScheduleNudgeOpen(false)}
+          onStartScheduling={() => {
+            setScheduleNudgeOpen(false);
+            if (isInbound) {
+              setScheduleStepperOpen(true);
+            } else {
+              applyGlobalAction('schedule');
+            }
+          }}
+        />
+      )}
+
+      {/* ── Schedule Stepper (inbound only) ── */}
+      {scheduleStepperOpen && (
+        <ScheduleStepperModal
+          methodSteps={METHOD_ORDER}
+          onClose={() => setScheduleStepperOpen(false)}
+          onStepComplete={(method, skipped) => {
+            if (!skipped) applyAction('schedule', true, undefined, '3/1/2026', false, method !== 'Onsite');
+          }}
+          siteAccessType={siteAccessType}
+          onSiteAccessTypeChange={setSiteAccessType}
+          paymentInfo={paymentInfo}
+          onPaymentInfoChange={setPaymentInfo}
+        />
+      )}
+
       {/* ── Action Modals ── */}
       {activeAction === 'schedule' && (
         isEmrRemote || (isInbound && effectiveMethod === 'emr-remote')
           ? <EmrrSaveProgressModal count={actionScope === 'global' ? requestRows.length : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, date, pmtReq) => applyAction('schedule', actionScope === 'global', status, date, pmtReq)} siteAccessType={siteAccessType} onSiteAccessTypeChange={setSiteAccessType} paymentInfo={paymentInfo} onPaymentInfoChange={setPaymentInfo} />
           : (retrievalMethod === 'onsite' || (isInbound && effectiveMethod === 'onsite'))
-            ? <OnsiteScheduleModal count={actionScope === 'global' ? requestRows.length : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, pmtReq) => applyAction('schedule', actionScope === 'global', status || 'Scheduled', '3/1/2026', pmtReq)} />
+            ? <OnsiteScheduleModal count={actionScope === 'global' ? requestRows.length : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, pmtReq) => applyAction('schedule', actionScope === 'global', status || 'Scheduled', '3/1/2026', pmtReq, false)} />
             : <ScheduleModal
                 count={actionScope === 'global' ? requestRows.length : selectedRows.size}
                 unblockedCount={actionScope === 'global' ? requestRows.filter(r => r.status === 'In Progress-Unblocked').length : [...selectedRows].filter(id => requestRows.find(r => r.id === id)?.status === 'In Progress-Unblocked').length}
@@ -2374,6 +2864,45 @@ function WorkspaceScreen({
         <RerouteModal count={actionScope === 'global' ? requestRows.length : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={() => applyAction('reroute', actionScope === 'global')} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
       )}
       {editSiteOpen && <EditSiteModal onClose={() => setEditSiteOpen(false)} isEmrRemote={isEmrRemote} siteAccessType={siteAccessType} onSiteAccessTypeChange={setSiteAccessType} />}
+
+      {/* Pends modal */}
+      {activePendsModalOpen && (
+        <ModalOverlay title="Pends" onClose={() => setActivePendsModalOpen(false)} size={480}>
+          {(() => {
+            const actionable = ACTIVE_PENDS.filter(p => p.actionable);
+            const blocked = ACTIVE_PENDS.filter(p => !p.actionable);
+            return (
+              <Stack gap={0}>
+                {actionable.length > 0 && (
+                  <>
+                    <Text size="xs" fw={600} mb={10} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.5 }}>Actionable</Text>
+                    {actionable.map(p => (
+                      <Box key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f0efec' }}>
+                        <Text size="md" fw={700} style={{ color: '#242423', minWidth: 36 }}>{p.count}</Text>
+                        <Text size="sm" fw={600} style={{ color: '#242423' }}>{p.code}</Text>
+                        <Box style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 6px', backgroundColor: '#dcfce7', borderRadius: 4 }}>
+                          <Text size="xs" fw={600} style={{ color: '#15803d' }}>Released</Text>
+                        </Box>
+                      </Box>
+                    ))}
+                  </>
+                )}
+                {blocked.length > 0 && (
+                  <Box mt={actionable.length > 0 ? 16 : 0}>
+                    <Text size="xs" fw={600} mb={10} style={{ color: '#6e6d6a', textTransform: 'uppercase', letterSpacing: 0.5 }}>Blocked</Text>
+                    {blocked.map(p => (
+                      <Box key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f0efec' }}>
+                        <Text size="md" fw={700} style={{ color: '#6e6d6a', minWidth: 36 }}>{p.count}</Text>
+                        <Text size="sm" fw={600} style={{ color: '#6e6d6a' }}>{p.code}</Text>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Stack>
+            );
+          })()}
+        </ModalOverlay>
+      )}
 
       {/* Mixed retrieval method error modal */}
       {mixedMethodError && (
