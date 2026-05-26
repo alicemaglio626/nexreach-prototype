@@ -19,6 +19,7 @@ import { NexReachNotes } from './pages/NexReachNotes';
 import { NexReachGPBlocked } from './pages/NexReachGPBlocked';
 import { NexReachPrototype } from './pages/NexReachPrototype';
 import { NexReachV2 } from './pages/NexReachV2';
+import { NexReachV25 } from './pages/NexReachV25';
 import { CreateStudy } from './pages/CreateStudy';
 import { HEORDataDiscovery } from './pages/HEORDataDiscovery';
 import { HEORContracting } from './pages/HEORContracting';
@@ -41,7 +42,7 @@ function App() {
     }
   };
 
-  const isNexReachPage = location.pathname === '/nexreach-notes' || location.pathname === '/nexreach-gp-blocked' || location.pathname === '/nexreach-v2' || location.pathname.startsWith('/nexreach-v3');
+  const isNexReachPage = location.pathname === '/nexreach-notes' || location.pathname === '/nexreach-gp-blocked' || location.pathname === '/nexreach-v2' || location.pathname === '/nexreach-v2-5' || location.pathname.startsWith('/nexreach-v3');
 
   return (
     <DatavantProvider environment="staging">
@@ -50,7 +51,8 @@ function App() {
           <Route path="/nexreach-notes" element={<NexReachNotes />} />
           <Route path="/nexreach-gp-blocked" element={<NexReachGPBlocked />} />
           <Route path="/nexreach-v2" element={<NexReachV2 />} />
-          <Route path="/nexreach-v3" element={<NexReachPrototype />} />
+          <Route path="/nexreach-v2-5" element={<NexReachV25 />} />
+          <Route path="/nexreach-v3/*" element={<NexReachPrototype />} />
         </Routes>
       ) : (
         <Box style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
