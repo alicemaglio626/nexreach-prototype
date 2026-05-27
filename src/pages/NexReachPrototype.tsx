@@ -2448,11 +2448,11 @@ function WorkspaceScreen({
                             Applies to all <Text component="span" fw={600} style={{ color: '#242423' }}>{TOTAL_RR_COUNT.toLocaleString()} RRs</Text> in this retrieval unit
                           </Text>
                         </Group>
-                        {verifiedRows.size > 0 && (
+                        {isConnected && (
                           <Group gap={4} align="center">
-                            <IconCheck size={12} color="#166534" />
-                            <Text size="xs" fw={600} style={{ color: '#166534' }}>
-                              {verifiedRows.size} member{verifiedRows.size === 1 ? '' : 's'} verified
+                            {verifiedRows.size >= 2 && <IconCheck size={12} color="#166534" />}
+                            <Text size="xs" fw={600} style={{ color: verifiedRows.size >= 2 ? '#166534' : '#6e6d6a' }}>
+                              {verifiedRows.size} / 2 members verified
                             </Text>
                           </Group>
                         )}
@@ -2584,29 +2584,6 @@ function WorkspaceScreen({
                                           <Text size="sm" fw={600} style={{ color: '#242423', whiteSpace: 'nowrap' }}>{provider}</Text>
                                           <Text size="xs" style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{totalForProvider} RRs</Text>
                                         </Group>
-                                        {allVerified ? (
-                                          <Group gap={4} align="center" wrap="nowrap" style={{ cursor: 'pointer' }} onClick={() => toggleVerifyProvider(rrIds)}>
-                                            <IconCheck size={13} color="#16a34a" />
-                                            <Text size="xs" fw={500} style={{ color: '#16a34a', whiteSpace: 'nowrap' }}>All verified</Text>
-                                          </Group>
-                                        ) : (
-                                          <Button intent="prominent" appearance="ghost" size="xs" onClick={() => toggleVerifyProvider(rrIds)}>
-                                            Verify provider subset
-                                          </Button>
-                                        )}
-                                        <Button
-                                          intent="neutral"
-                                          appearance="ghost"
-                                          size="xs"
-                                          disabled={!canTakeAction}
-                                          onClick={() => {
-                                            setSelectedRows(new Set(rrIds));
-                                            setActionScope('selected');
-                                            setActiveAction('research');
-                                          }}
-                                        >
-                                          Research provider subset
-                                        </Button>
                                       </Group>
                                     </Table.Td>
                                   </Table.Tr>
@@ -2666,13 +2643,13 @@ function WorkspaceScreen({
                                               appearance="ghost"
                                               size="xs"
                                               disabled={!canTakeAction}
+                                              leftSection={<IconArrowRight size={12} />}
                                               onClick={() => {
                                                 setSelectedRows(new Set([row.id]));
                                                 setActionScope('selected');
                                                 setActiveAction('research');
                                               }}
                                             >
-                                              <IconArrowRight size={12} style={{ marginRight: 4 }} />
                                               Research
                                             </Button>
                                           </Stack>
