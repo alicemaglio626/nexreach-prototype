@@ -1806,12 +1806,6 @@ function WorkspaceScreen({
     });
   };
 
-  useEffect(() => {
-    if (verifiedRows.size >= 2 && !nudgeTriggeredRef.current && !scheduleStepperOpen && !activeAction) {
-      nudgeTriggeredRef.current = true;
-      setScheduleNudgeOpen(true);
-    }
-  }, [verifiedRows.size]);
 
   const toggleExpanded = (provider: string) => {
     setExpandedProviders(prev => {
