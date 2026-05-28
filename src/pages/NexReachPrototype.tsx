@@ -1410,11 +1410,17 @@ function LandingScreen({
 
 // ─── Schedule Nudge Modal ────────────────────────────────────────────────────
 
-function ScheduleNudgeModal({ rrCount, isInbound, onDismiss, onStartScheduling }: {
-  rrCount: number; isInbound: boolean; onDismiss: () => void; onStartScheduling: () => void;
+function ScheduleNudgeModal({ rrCount, isInbound, isEmrr, onDismiss, onStartScheduling }: {
+  rrCount: number; isInbound: boolean; isEmrr?: boolean; onDismiss: () => void; onStartScheduling: () => void;
 }) {
   return (
-    <ModalOverlay title="Ready to Schedule?" submitLabel="Start Scheduling" onClose={onDismiss} onSubmit={onStartScheduling} size={480}>
+    <ModalOverlay
+      title={isEmrr ? 'Ready to Update Progress?' : 'Ready to Schedule?'}
+      submitLabel={isEmrr ? 'Update Progress' : 'Start Scheduling'}
+      onClose={onDismiss}
+      onSubmit={onStartScheduling}
+      size={480}
+    >
       <Stack gap="md">
         <Box style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 16px' }}>
           <Group gap={8} align="center">
@@ -1423,9 +1429,14 @@ function ScheduleNudgeModal({ rrCount, isInbound, onDismiss, onStartScheduling }
           </Group>
         </Box>
         <Text size="sm" style={{ color: '#4f4e4c', lineHeight: 1.6 }}>
-          You're ready to schedule all{' '}
-          <Text component="span" fw={700} style={{ color: '#242423' }}>{rrCount.toLocaleString()} record requests</Text>.
-          {isInbound && ' The scheduling flow will walk you through each retrieval method in sequence.'}
+          {isEmrr ? (
+            <>You're ready to update progress for all{' '}
+            <Text component="span" fw={700} style={{ color: '#242423' }}>{rrCount.toLocaleString()} record requests</Text>.</>
+          ) : (
+            <>You're ready to schedule all{' '}
+            <Text component="span" fw={700} style={{ color: '#242423' }}>{rrCount.toLocaleString()} record requests</Text>.
+            {isInbound && ' The scheduling flow will walk you through each retrieval method in sequence.'}</>
+          )}
         </Text>
       </Stack>
     </ModalOverlay>
@@ -2003,7 +2014,7 @@ function WorkspaceScreen({
       </Box>
 
       {/* Page header — sticky */}
-      <Box style={{ backgroundColor: '#fff', borderBottom: '1px solid #e7e5df', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+      <Box style={{ backgroundColor: '#fff', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <Title order={2} fw={500} style={{ fontSize: 24, flexShrink: 0 }}>NexReach</Title>
         <Group gap="sm" style={{ flexShrink: 0 }}>
           <Button intent="neutral" appearance="outline" size="sm" onClick={onBackToSearch}>Back to Search</Button>
@@ -2023,54 +2034,44 @@ function WorkspaceScreen({
 
         {/* LEFT PANEL — Site Details with collapse toggle */}
         {siteDetailsCollapsed ? (
-          /* Collapsed: vertical tab affixed to the left edge */
-          <Box
-            onClick={() => setSiteDetailsCollapsed(false)}
-            style={{
-              flexShrink: 0, alignSelf: 'stretch',
-              width: 28,
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-              paddingTop: 24,
-              cursor: 'pointer',
-            }}
-          >
+          /* Collapsed: narrow sliver with expand button + rotated label */
+          <Box style={{ width: 36, flexShrink: 0, position: 'relative', backgroundColor: '#f7f6f4', borderRadius: '0 12px 12px 0', alignSelf: 'stretch' }}>
             <Box
+              onClick={() => setSiteDetailsCollapsed(false)}
               style={{
-                background: '#f7f6f4',
-                border: '1px solid #e7e5df',
-                borderLeft: 'none',
-                borderRadius: '0 8px 8px 0',
-                padding: '14px 6px',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                boxShadow: '2px 0 6px rgba(0,0,0,0.06)',
+                position: 'absolute', top: 64, right: -14,
+                width: 28, height: 28, borderRadius: '50%',
+                backgroundColor: '#fff', border: '2px solid #006ccf',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', zIndex: 10,
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#eaf5ff'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = '#f7f6f4'; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#e8f0fe'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#fff'; }}
             >
-              <IconChevronRight size={13} color="#4f4e4c" />
-              <Text size="xs" fw={500} style={{ writingMode: 'vertical-rl', color: '#4f4e4c', letterSpacing: '0.3px', whiteSpace: 'nowrap', transform: 'rotate(180deg)' }}>Site Details</Text>
+              <IconChevronRight size={14} color="#006ccf" />
             </Box>
+            <Text size="xs" style={{ color: '#6e6d6a', position: 'absolute', top: 112, left: '50%', transform: 'translateX(-50%) rotate(180deg)', writingMode: 'vertical-rl', whiteSpace: 'nowrap', letterSpacing: 0.3 }}>Site Details</Text>
           </Box>
         ) : (
-          /* Expanded: full panel with collapse button straddling right edge of card */
-          <Box style={{ width: 233, minWidth: 233, flexShrink: 0, overflowY: 'auto', padding: '20px' }}>
-            <Box style={{ backgroundColor: '#f7f6f4', borderRadius: 12, padding: '20px 16px', position: 'relative' }}>
-              {/* Collapse button — straddles right edge of the card */}
-              <Box
-                onClick={() => setSiteDetailsCollapsed(true)}
-                style={{
-                  position: 'absolute', right: -14, top: 64,
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: '#fff', border: '1px solid #e7e5df',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.12)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', zIndex: 10,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#006ccf'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e7e5df'; }}
-              >
-                <IconChevronLeft size={14} color="#4f4e4c" />
-              </Box>
+          /* Expanded: full panel with collapse button pinned to card edge */
+          <Box style={{ width: 233, minWidth: 233, flexShrink: 0, position: 'relative' }}>
+            <Box
+              onClick={() => setSiteDetailsCollapsed(true)}
+              style={{
+                position: 'absolute', right: 6, top: 84,
+                width: 28, height: 28, borderRadius: '50%',
+                backgroundColor: '#fff', border: '2px solid #006ccf',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.16)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', zIndex: 10,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#e8f0fe'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+            >
+              <IconChevronLeft size={14} color="#006ccf" />
+            </Box>
+            <Box style={{ overflowY: 'auto', height: '100%', padding: '20px' }}>
+            <Box style={{ backgroundColor: '#f7f6f4', borderRadius: 12, padding: '20px 16px' }}>
               <Group justify="space-between" align="center" mb={16}>
                 <Text size="md" fw={500}>Site Details</Text>
                 <Text size="xs" fw={500} style={{ color: '#006ccf', cursor: 'pointer' }} onClick={() => setEditSiteOpen(true)}>Edit</Text>
@@ -2094,7 +2095,7 @@ function WorkspaceScreen({
               </Stack>
 
               {/* Agent Notes button */}
-              <Box style={{ borderTop: '1px solid #e7e5df', marginTop: 16, paddingTop: 16 }}>
+              <Box style={{ marginTop: 16 }}>
                 <Box
                   onClick={() => setNotesDrawerOpen(true)}
                   style={{
@@ -2112,6 +2113,7 @@ function WorkspaceScreen({
                   <Badge status="prominent" type="number">{notes.length}</Badge>
                 </Box>
               </Box>
+            </Box>
             </Box>
           </Box>
         )}
@@ -2459,10 +2461,10 @@ function WorkspaceScreen({
                       </Group>
                       <Group gap={6} wrap="wrap">
                         {((!isInbound && isEmrRemote)
-                          ? [['Update Progress', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
+                          ? [['Update Progress', 'schedule'], ['Send All to Research', 'research'], ['Reroute All', 'reroute'], ['Pend All', 'pend']] as [string, ActionType][]
                           : isInbound
-                            ? [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
-                            : [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Pend All', 'pend'], ['Reroute All', 'reroute']] as [string, ActionType][]
+                            ? [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Reroute All', 'reroute'], ['Pend All', 'pend']] as [string, ActionType][]
+                            : [['Schedule All', 'schedule'], ['Send All to Research', 'research'], ['Reroute All', 'reroute'], ['Pend All', 'pend']] as [string, ActionType][]
                         ).map(([label, action]) => (
                           <Button
                             key={label}
@@ -2574,7 +2576,7 @@ function WorkspaceScreen({
                                 const headerRow = (
                                   <Table.Tr key={`hdr-${provider}`} style={{ backgroundColor: '#f7f6f4', borderTop: '2px solid #ddd8d0', borderBottom: '1px solid #e7e5df' }}>
                                     <Table.Td colSpan={20} style={{ padding: '5px 10px 5px 12px' }}>
-                                      <Group gap={12} wrap="nowrap" align="center">
+                                      <Group gap={12} wrap="nowrap" align="center" justify="space-between">
                                         <Group gap={8} align="center" style={{ cursor: 'pointer' }} onClick={() => toggleExpanded(provider)}>
                                           <IconChevronDown
                                             size={14}
@@ -2583,6 +2585,25 @@ function WorkspaceScreen({
                                           />
                                           <Text size="sm" fw={600} style={{ color: '#242423', whiteSpace: 'nowrap' }}>{provider}</Text>
                                           <Text size="xs" style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{totalForProvider} RRs</Text>
+                                        </Group>
+                                        <Group gap={6} wrap="nowrap">
+                                          <Button
+                                            intent="prominent"
+                                            appearance="outline"
+                                            size="xs"
+                                            onClick={(e) => { e.stopPropagation(); rrIds.forEach(id => setVerifiedRows(prev => { const next = new Set(prev); next.add(id); return next; })); }}
+                                          >
+                                            Verify Provider
+                                          </Button>
+                                          <Button
+                                            intent="neutral"
+                                            appearance="outline"
+                                            size="xs"
+                                            disabled={!canTakeAction}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedRows(new Set(rrIds)); setActionScope('selected'); setActiveAction('research'); }}
+                                          >
+                                            Send Provider to Research
+                                          </Button>
                                         </Group>
                                       </Group>
                                     </Table.Td>
@@ -3566,6 +3587,7 @@ function WorkspaceScreen({
         <ScheduleNudgeModal
           rrCount={TOTAL_RR_COUNT}
           isInbound={isInbound}
+          isEmrr={isEmrrContext}
           onDismiss={() => setScheduleNudgeOpen(false)}
           onStartScheduling={() => {
             setScheduleNudgeOpen(false);
