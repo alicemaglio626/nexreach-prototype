@@ -2576,7 +2576,7 @@ function WorkspaceScreen({
                                 const headerRow = (
                                   <Table.Tr key={`hdr-${provider}`} style={{ backgroundColor: '#f7f6f4', borderTop: '2px solid #ddd8d0', borderBottom: '1px solid #e7e5df' }}>
                                     <Table.Td colSpan={20} style={{ padding: '5px 10px 5px 12px' }}>
-                                      <Group gap={12} wrap="nowrap" align="center" justify="space-between">
+                                      <Group gap={8} wrap="nowrap" align="center">
                                         <Group gap={8} align="center" style={{ cursor: 'pointer' }} onClick={() => toggleExpanded(provider)}>
                                           <IconChevronDown
                                             size={14}
@@ -2586,25 +2586,23 @@ function WorkspaceScreen({
                                           <Text size="sm" fw={600} style={{ color: '#242423', whiteSpace: 'nowrap' }}>{provider}</Text>
                                           <Text size="xs" style={{ color: '#6e6d6a', whiteSpace: 'nowrap' }}>{totalForProvider} RRs</Text>
                                         </Group>
-                                        <Group gap={6} wrap="nowrap">
-                                          <Button
-                                            intent="prominent"
-                                            appearance="outline"
-                                            size="xs"
-                                            onClick={(e) => { e.stopPropagation(); rrIds.forEach(id => setVerifiedRows(prev => { const next = new Set(prev); next.add(id); return next; })); }}
-                                          >
-                                            Verify Provider
-                                          </Button>
-                                          <Button
-                                            intent="neutral"
-                                            appearance="outline"
-                                            size="xs"
-                                            disabled={!canTakeAction}
-                                            onClick={(e) => { e.stopPropagation(); setSelectedRows(new Set(rrIds)); setActionScope('selected'); setActiveAction('research'); }}
-                                          >
-                                            Send Provider to Research
-                                          </Button>
-                                        </Group>
+                                        <Button
+                                          intent="prominent"
+                                          appearance="outline"
+                                          size="xs"
+                                          onClick={(e) => { e.stopPropagation(); rrIds.forEach(id => setVerifiedRows(prev => { const next = new Set(prev); next.add(id); return next; })); }}
+                                        >
+                                          Verify Provider
+                                        </Button>
+                                        <Button
+                                          intent="neutral"
+                                          appearance="outline"
+                                          size="xs"
+                                          disabled={!canTakeAction}
+                                          onClick={(e) => { e.stopPropagation(); setSelectedRows(new Set(rrIds)); setActionScope('selected'); setActiveAction('research'); }}
+                                        >
+                                          Send Provider to Research
+                                        </Button>
                                       </Group>
                                     </Table.Td>
                                   </Table.Tr>
