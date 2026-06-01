@@ -948,16 +948,25 @@ function OnsiteScheduleModal({ count, onClose, onSubmit }: { count: number; onCl
   );
 }
 
-function ResearchModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange }: { count: number; onClose: () => void; onSubmit?: () => void; siteAccessType?: string | null; onSiteAccessTypeChange?: (v: string) => void }) {
+function ResearchModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange, defaultReason }: { count: number; onClose: () => void; onSubmit?: () => void; siteAccessType?: string | null; onSiteAccessTypeChange?: (v: string) => void; defaultReason?: string }) {
   const [phone] = useState('718-555-1234');
-  const [suggestedPhone] = useState('718-555-1236');
+  const [reason, setReason] = useState<string | null>(defaultReason ?? 'member_verify');
+  const [suggestedPhone, setSuggestedPhone] = useState('');
   const [notes, setNotes] = useState('');
   const readOnlyInput = { backgroundColor: '#f7f6f4', color: '#6b7280' };
+  const reasonOptions = [
+    { value: 'member_verify', label: 'Member verification not possible' },
+    { value: 'not_on_file', label: 'Provider not on file' },
+  ];
   return (
     <ModalOverlay title={`Sending ${count} Record Request(s) to Research`} submitLabel="Send Record Request(s)" onClose={onClose} onSubmit={onSubmit}>
       <TextInput label="Phone Number Attempted" value={phone} readOnly styles={{ input: readOnlyInput }} />
-      <TextInput label="Reason" value="Member verification not possible" readOnly styles={{ input: readOnlyInput }} />
-      <TextInput label="Suggested Phone Number" value={suggestedPhone} readOnly styles={{ input: readOnlyInput }} />
+      {defaultReason ? (
+        <TextInput label="Reason" value={reasonOptions.find(o => o.value === defaultReason)?.label ?? defaultReason} readOnly styles={{ input: readOnlyInput }} />
+      ) : (
+        <Select comboboxProps={{ zIndex: 10001 }} label="Reason" data={reasonOptions} value={reason} onChange={setReason} />
+      )}
+      <TextInput label="Suggested Phone Number" placeholder="Enter a suggested phone number" value={suggestedPhone} onChange={(e) => setSuggestedPhone(e.currentTarget.value)} />
       <Textarea label="Notes" placeholder="Add an optional note for the research team" rows={4} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
     </ModalOverlay>
   );
@@ -1316,13 +1325,12 @@ function SiteClosedModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
 function LandingScreen({
   phoneValue, onPhoneChange, callType, onCallTypeChange,
-  retrieval, onRetrievalChange, onSearch, onBrowseRRs,
+  retrieval, onRetrievalChange, onSearch,
 }: {
   phoneValue: string; onPhoneChange: (v: string) => void;
   callType: string; onCallTypeChange: (v: string) => void;
   retrieval: string; onRetrievalChange: (v: string) => void;
   onSearch: () => void;
-  onBrowseRRs: () => void;
 }) {
   return (
     <Box style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1333,22 +1341,7 @@ function LandingScreen({
       </Box>
 
       <Box style={{ flex: 1, backgroundColor: '#fff', padding: '20px 20px', overflow: 'auto', width: '100%' }}>
-        <Group justify="space-between" align="center" mb={32}>
-          <Title order={2} fw={500} style={{ fontSize: 24 }}>NexReach</Title>
-          <Box
-            onClick={onBrowseRRs}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 6, cursor: 'pointer',
-              border: '1px solid #8a8985', fontSize: 14, fontWeight: 500, color: '#4f4e4c',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7f6f4'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            <IconSearch size={14} />
-            Browse all Record Requests
-          </Box>
-        </Group>
+        <Title order={2} fw={500} style={{ fontSize: 24, marginBottom: 32 }}>NexReach</Title>
 
         <Stack gap="lg" style={{ maxWidth: 480 }}>
           <Box>
@@ -1422,12 +1415,7 @@ function ScheduleNudgeModal({ rrCount, isInbound, isEmrr, onDismiss, onStartSche
       size={480}
     >
       <Stack gap="md">
-        <Box style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 16px' }}>
-          <Group gap={8} align="center">
-            <IconCheck size={15} color="#1d4ed8" />
-            <Text size="sm" fw={600} style={{ color: '#1e40af' }}>2 members verified — compliance threshold met</Text>
-          </Group>
-        </Box>
+        <Alert status="positive" title="2 members verified — compliance threshold met" withCloseButton={false} style={{ boxShadow: 'none' }} />
         <Text size="sm" style={{ color: '#4f4e4c', lineHeight: 1.6 }}>
           {isEmrr ? (
             <>You're ready to update progress for all{' '}
@@ -1663,6 +1651,7 @@ function WorkspaceScreen({
 }) {
   const [contactResult, setContactResult] = useState<ContactResult>(null);
   const [siteAccessType, setSiteAccessType] = useState<string | null>(null);
+  const [researchReason, setResearchReason] = useState<string | undefined>(undefined);
   const [noContactReason, setNoContactReason] = useState<string | null>(null);
   const [noContactSubmitted, setNoContactSubmitted] = useState(false);
   const [noContactModalOpen, setNoContactModalOpen] = useState(false);
@@ -1865,6 +1854,13 @@ function WorkspaceScreen({
   const isInbound = retrievalMethod === 'inbound';
   const isEmrRemote = isInbound ? false : retrievalMethod === 'emr-remote';
 
+  useEffect(() => {
+    if (verifiedRows.size >= 2 && !nudgeTriggeredRef.current && isConnected) {
+      nudgeTriggeredRef.current = true;
+      setScheduleNudgeOpen(true);
+    }
+  }, [verifiedRows.size, isConnected]);
+
   // For inbound: determine the active retrieval method from filter selection
   const methodFilter = filters['Retrieval Method'];
   const filteredToSingleMethod = methodFilter && methodFilter.size === 1;
@@ -1955,11 +1951,11 @@ function WorkspaceScreen({
   // Apply global action to all rows
   const applyGlobalAction = (action: ActionType) => {
     if (action === 'release') {
-      // Release fires immediately — no modal
       setActionScope('global');
       applyAction('release', true);
       return;
     }
+    if (action === 'research') setResearchReason(undefined);
     setActionScope('global');
     setActiveAction(action);
   };
@@ -2593,7 +2589,7 @@ function WorkspaceScreen({
                                           appearance="outline"
                                           size="xs"
                                           disabled={!canTakeAction}
-                                          onClick={(e) => { e.stopPropagation(); setSelectedRows(new Set(rrIds)); setActionScope('selected'); setActiveAction('research'); }}
+                                          onClick={(e) => { e.stopPropagation(); setSelectedRows(new Set(rrIds)); setActionScope('selected'); setResearchReason('not_on_file'); setActiveAction('research'); }}
                                         >
                                           Send Provider to Research
                                         </Button>
@@ -2660,6 +2656,7 @@ function WorkspaceScreen({
                                               onClick={() => {
                                                 setSelectedRows(new Set([row.id]));
                                                 setActionScope('selected');
+                                                setResearchReason(undefined);
                                                 setActiveAction('research');
                                               }}
                                             >
@@ -3660,7 +3657,7 @@ function WorkspaceScreen({
               />
       )}
       {activeAction === 'research' && (
-        <ResearchModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={() => applyAction('research', actionScope === 'global')} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
+        <ResearchModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); setResearchReason(undefined); }} onSubmit={() => applyAction('research', actionScope === 'global')} defaultReason={researchReason} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
       )}
       {activeAction === 'pend' && (
         <PendModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={() => applyAction('pend', actionScope === 'global')} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
@@ -3822,7 +3819,6 @@ export function NexReachPrototype() {
       retrieval={retrieval}
       onRetrievalChange={setRetrieval}
       onSearch={handleSearch}
-      onBrowseRRs={() => navigate('/nexreach-v3/inbound/search')}
     />
   );
 }
