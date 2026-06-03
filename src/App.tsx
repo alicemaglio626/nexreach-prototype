@@ -42,7 +42,7 @@ function App() {
     }
   };
 
-  const isNexReachPage = location.pathname === '/nexreach-notes' || location.pathname === '/nexreach-gp-blocked' || location.pathname === '/nexreach-v2' || location.pathname === '/nexreach-v2-5' || location.pathname.startsWith('/nexreach-v3');
+  const isNexReachPage = location.pathname === '/nexreach-notes' || location.pathname === '/nexreach-gp-blocked' || location.pathname === '/nexreach-v2' || location.pathname.startsWith('/nexreach-v2-5') || location.pathname.startsWith('/nexreach-v3');
 
   return (
     <DatavantProvider environment="staging">
@@ -51,7 +51,7 @@ function App() {
           <Route path="/nexreach-notes" element={<NexReachNotes />} />
           <Route path="/nexreach-gp-blocked" element={<NexReachGPBlocked />} />
           <Route path="/nexreach-v2" element={<NexReachV2 />} />
-          <Route path="/nexreach-v2-5" element={<NexReachV25 />} />
+          <Route path="/nexreach-v2-5/*" element={<NexReachV25 />} />
           <Route path="/nexreach-v3/*" element={<NexReachPrototype />} />
         </Routes>
       ) : (

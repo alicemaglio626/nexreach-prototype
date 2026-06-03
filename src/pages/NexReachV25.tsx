@@ -70,6 +70,8 @@ interface PaymentInfo {
   submissionMethod: string;
 }
 
+interface PPSubmission { method: string; timestamp: string; }
+
 // ─── Mock Data ───────────────────────────────────────────────────────────────
 
 const INITIAL_NOTES: Note[] = [
@@ -915,19 +917,23 @@ function OnsiteScheduleModal({ count, onClose, onSubmit }: { count: number; onCl
   );
 }
 
-function ResearchModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange }: { count: number; onClose: () => void; onSubmit?: () => void; siteAccessType?: string | null; onSiteAccessTypeChange?: (v: string) => void }) {
+function ResearchModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange, defaultReason }: { count: number; onClose: () => void; onSubmit?: () => void; siteAccessType?: string | null; onSiteAccessTypeChange?: (v: string) => void; defaultReason?: string }) {
   const [phone] = useState('718-555-1234');
-  const [reason, setReason] = useState<string | null>('member_verify');
-  const [suggestedPhone, setSuggestedPhone] = useState('718-555-1236');
-  const [notes, setNotes] = useState('Could not verify 2 [members or providers]. Sent to research.');
+  const [reason, setReason] = useState<string | null>(defaultReason ?? 'member_verify');
+  const [suggestedPhone, setSuggestedPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const reasonOptions = [
+    { value: 'member_verify', label: 'Member verification not possible' },
+    { value: 'not_on_file', label: 'Provider not on file' },
+  ];
   return (
     <ModalOverlay title={`Sending ${count} Record Request(s) to Research`} submitLabel="Send Record Request(s)" onClose={onClose} onSubmit={onSubmit}>
-      {/* SiteAccessTypePrompt hidden for now */}
       <TextInput label="Phone Number Attempted" required value={phone} readOnly styles={{ input: { backgroundColor: '#f7f6f4', color: '#6b7280' } }} />
-      <Select comboboxProps={{ zIndex: 10001 }} label="Reason" required data={[
-        { value: 'member_verify', label: 'Member verification not possible' },
-        { value: 'not_on_file', label: 'Provider not on file' },
-      ]} value={reason} onChange={setReason} />
+      {defaultReason ? (
+        <TextInput label="Reason" value={reasonOptions.find(o => o.value === defaultReason)?.label ?? defaultReason} readOnly styles={{ input: { backgroundColor: '#f7f6f4', color: '#6b7280' } }} />
+      ) : (
+        <Select comboboxProps={{ zIndex: 10001 }} label="Reason" required data={reasonOptions} value={reason} onChange={setReason} />
+      )}
       <TextInput label="Suggested Phone Number" value={suggestedPhone} onChange={(e) => setSuggestedPhone(e.currentTarget.value)} />
       <Textarea label="Notes" required rows={4} value={notes} onChange={(e) => setNotes(e.currentTarget.value)} />
     </ModalOverlay>
@@ -1113,15 +1119,16 @@ function SiteAccessTypePrompt({ value, onChange, alreadySaved }: { value: string
 
 // ─── EMRR Save Progress Modal ─────────────────────────────────────────────────
 
-function EmrrSaveProgressModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange, paymentInfo, onPaymentInfoChange }: {
+function EmrrSaveProgressModal({ count, onClose, onSubmit, siteAccessType, onSiteAccessTypeChange, paymentInfo, onPaymentInfoChange, onPPSent }: {
   count: number; onClose: () => void; onSubmit?: (credentialStatus: string, commitDate?: string, paymentRequired?: boolean) => void;
   siteAccessType: string | null; onSiteAccessTypeChange: (v: string) => void;
   paymentInfo: PaymentInfo | null; onPaymentInfoChange: (info: PaymentInfo) => void;
+  onPPSent?: (method: string, timestamp: string) => void;
 }) {
   const [credentialStatus, setCredentialStatus] = useState<string | null>(null);
   const [localSiteType, setLocalSiteType] = useState<string | null>(siteAccessType);
   const [scheduleDate, setScheduleDate] = useState('');
-  const [notes, setNotes] = useState('Verified 2 members or providers. Scheduled inventory.');
+  const [notes, setNotes] = useState('');
   const [editingPayment, setEditingPayment] = useState(false);
 
   // Payment fields — initialize from saved info if available
@@ -1162,6 +1169,11 @@ function EmrrSaveProgressModal({ count, onClose, onSubmit, siteAccessType, onSit
         providerPackage: includeProviderPkg,
         submissionMethod: submissionMethod || 'mail',
       });
+    }
+    if (includeProviderPkg === 'yes' && !paymentInfo && onPPSent) {
+      const now = new Date();
+      const ts = `${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getDate().toString().padStart(2,'0')}/${now.getFullYear()}, ${now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+      onPPSent(submissionMethod || 'fax', ts);
     }
     // Map dropdown value to display label for the table
     const statusLabels: Record<string, string> = {
@@ -1437,6 +1449,7 @@ function WorkspaceScreen({
   const [noContactSubmitted, setNoContactSubmitted] = useState(false);
   const [noContactModalOpen, setNoContactModalOpen] = useState(false);
   const [activeAction, setActiveAction] = useState<ActionType | null>(null);
+  const [researchReason, setResearchReason] = useState<string | undefined>(undefined);
   const [actionScope, setActionScope] = useState<'selected' | 'global'>('selected');
   const [editSiteOpen, setEditSiteOpen] = useState(false);
   const [notesDrawerOpen, setNotesDrawerOpen] = useState(false);
@@ -1463,6 +1476,12 @@ function WorkspaceScreen({
       return saved ? (JSON.parse(saved).paymentInfo ?? null) : null;
     } catch { return null; }
   });
+  const [ppSubmissions, setPpSubmissions] = useState<PPSubmission[]>(() => {
+    try {
+      const saved = localStorage.getItem(DEMO_STORAGE_KEY);
+      return saved ? (JSON.parse(saved).ppSubmissions ?? []) : [];
+    } catch { return []; }
+  });
   const [filters, setFilters] = useState<Record<string, Set<string>>>({});
 
   const toggleFilter = (filterKey: string, value: string) => {
@@ -1487,6 +1506,13 @@ function WorkspaceScreen({
       localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({ ...current, requestRows }));
     } catch {}
   }, [requestRows]);
+
+  useEffect(() => {
+    try {
+      const current = JSON.parse(localStorage.getItem(DEMO_STORAGE_KEY) || '{}');
+      localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify({ ...current, ppSubmissions }));
+    } catch {}
+  }, [ppSubmissions]);
 
   const resetFilters = () => setFilters({});
 
@@ -1571,6 +1597,7 @@ function WorkspaceScreen({
 
   // Apply global action to all rows
   const applyGlobalAction = (action: ActionType) => {
+    if (action === 'research') setResearchReason(undefined);
     setActionScope('global');
     setActiveAction(action);
   };
@@ -1617,6 +1644,9 @@ function WorkspaceScreen({
     }
     return true;
   });
+
+  const globalActionCount = sampleSize > 0 ? Math.round(filteredRows.length / sampleSize * TOTAL_RR_COUNT) : 0;
+  const ppMethodLabel = (method: string) => method === 'fax' ? 'Fax Sent' : method === 'mail' ? 'Mailed' : method === 'email' ? 'Emailed' : method;
 
   return (
     <Box style={{ height: '100vh', width: '100vw', maxWidth: '100vw', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -1741,14 +1771,11 @@ function WorkspaceScreen({
             <Box mb="lg">
               <Flex justify="space-between" align="center" mb={16}>
                 <Text fw={700} size="lg" style={{ fontSize: 18 }}>Call Actions</Text>
-                {isEmrRemote && (
+                {isEmrRemote && ppSubmissions.length > 0 && (
                   <Box style={{ border: '1px solid #e7e5df', borderRadius: 8, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <IconFileDescription size={14} color="#4f4e4c" />
                     <Text size="sm" fw={500} style={{ color: '#242423' }}>PP Status:</Text>
-                    <Group gap={4}>
-                      <IconAlertTriangle size={13} color="#b45309" />
-                      <Text size="sm" style={{ color: '#b45309', fontWeight: 500 }}>Fax Pending</Text>
-                    </Group>
+                    <Text size="sm" style={{ color: '#1f7c53', fontWeight: 500 }}>{ppMethodLabel(ppSubmissions[0].method)}</Text>
                     <Text size="sm" style={{ color: '#006ccf', cursor: 'pointer' }} onClick={() => setPpStatusModalOpen(true)}>View Details</Text>
                   </Box>
                 )}
@@ -2359,13 +2386,13 @@ function WorkspaceScreen({
       {/* ── Action Modals ── */}
       {activeAction === 'schedule' && (
         isEmrRemote || (isInbound && effectiveMethod === 'emr-remote')
-          ? <EmrrSaveProgressModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, date, pmtReq) => applyAction('schedule', actionScope === 'global', status, date, pmtReq)} siteAccessType={siteAccessType} onSiteAccessTypeChange={setSiteAccessType} paymentInfo={paymentInfo} onPaymentInfoChange={setPaymentInfo} />
+          ? <EmrrSaveProgressModal count={actionScope === 'global' ? globalActionCount : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, date, pmtReq) => applyAction('schedule', actionScope === 'global', status, date, pmtReq)} siteAccessType={siteAccessType} onSiteAccessTypeChange={setSiteAccessType} paymentInfo={paymentInfo} onPaymentInfoChange={setPaymentInfo} onPPSent={(method, ts) => setPpSubmissions(prev => [{ method, timestamp: ts }, ...prev])} />
           : (retrievalMethod === 'onsite' || (isInbound && effectiveMethod === 'onsite'))
             ? <OnsiteScheduleModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, pmtReq) => applyAction('schedule', actionScope === 'global', status || 'Scheduled', '3/1/2026', pmtReq)} />
             : <ScheduleModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(date, pmtReq) => applyAction('schedule', actionScope === 'global', undefined, date, pmtReq)} />
       )}
       {activeAction === 'research' && (
-        <ResearchModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={() => applyAction('research', actionScope === 'global')} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
+        <ResearchModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); setResearchReason(undefined); }} onSubmit={() => applyAction('research', actionScope === 'global')} defaultReason={researchReason} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
       )}
       {activeAction === 'pend' && (
         <PendModal count={actionScope === 'global' ? TOTAL_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={() => applyAction('pend', actionScope === 'global')} {...(isEmrRemote ? { siteAccessType, onSiteAccessTypeChange: setSiteAccessType } : {})} />
@@ -2393,25 +2420,15 @@ function WorkspaceScreen({
                 </tr>
               </thead>
               <tbody>
-                {[
-                  { status: 'Fax Pending', warn: true, reason: '--', fax: '718-555-5678', ppId: 'HG-SCGLYQP4', ts: '05/28/2026, 9:03 AM' },
-                  { status: 'EMAIL', warn: false, reason: '--', fax: '--', ppId: 'HG-DN635A65', ts: '05/27/2026, 3:05 PM' },
-                ].map((row, i) => (
+                {ppSubmissions.map((sub, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #e7e5df' }}>
                     <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}>
-                      {row.warn ? (
-                        <Group gap={5}>
-                          <IconAlertTriangle size={13} color="#b45309" />
-                          <Text size="sm" style={{ color: '#b45309', fontWeight: 500 }}>{row.status}</Text>
-                        </Group>
-                      ) : (
-                        <Text size="sm" style={{ color: '#333231' }}>{row.status}</Text>
-                      )}
+                      <Text size="sm" style={{ color: '#1f7c53', fontWeight: 500 }}>{ppMethodLabel(sub.method)}</Text>
                     </td>
-                    <td style={{ padding: '10px 12px' }}><Text size="sm" style={{ color: '#6e6d6a' }}>{row.reason}</Text></td>
-                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}><Text size="sm" style={{ color: '#333231' }}>{row.fax}</Text></td>
-                    <td style={{ padding: '10px 12px' }}><Text size="sm" style={{ color: '#333231' }}>{row.ppId}</Text></td>
-                    <td style={{ padding: '10px 12px' }}><Text size="sm" style={{ color: '#333231', whiteSpace: 'nowrap' }}>{row.ts}</Text></td>
+                    <td style={{ padding: '10px 12px' }}><Text size="sm" style={{ color: '#4f4e4c' }}>--</Text></td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}><Text size="sm" style={{ color: '#4f4e4c' }}>{sub.method === 'fax' ? '718-555-5678' : '--'}</Text></td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}><Text size="sm" style={{ color: '#4f4e4c' }}>HG-{Math.abs(sub.timestamp.charCodeAt(0) * 31 + sub.timestamp.charCodeAt(1) * 17).toString(16).toUpperCase().padStart(8, '0').slice(0, 8)}</Text></td>
+                    <td style={{ padding: '10px 12px', whiteSpace: 'nowrap' }}><Text size="sm" style={{ color: '#4f4e4c' }}>{sub.timestamp}</Text></td>
                   </tr>
                 ))}
               </tbody>

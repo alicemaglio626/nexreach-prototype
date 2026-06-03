@@ -1680,7 +1680,6 @@ function WorkspaceScreen({
   const [activePendsModalOpen, setActivePendsModalOpen] = useState(false);
   const [scheduleNudgeOpen, setScheduleNudgeOpen] = useState(false);
   const [scheduleStepperOpen, setScheduleStepperOpen] = useState(false);
-  const [rerouteStepperOpen, setRerouteStepperOpen] = useState(false);
   const nudgeTriggeredRef = useRef(false);
   type UndoEntry = {
     id: string;
@@ -2218,7 +2217,7 @@ function WorkspaceScreen({
                       const uniquePlans = [...new Set(requestRows.map(r => r.plan))];
                       const lastCall = CALL_HISTORY_ROWS[0];
                       const showUnifiedCard = (retrievalMethod === 'offsite' || retrievalMethod === 'onsite' || retrievalMethod === 'emr-remote' || isInbound);
-                      const showPends = isInbound;
+                      const showPends = false; // PENDS card cut from snapshot
                       const isOffsiteOrOnsite = retrievalMethod === 'offsite' || retrievalMethod === 'onsite';
                       const gridCols = showPends
                         ? '1fr 1px 1fr 1px 1fr'
@@ -2466,9 +2465,6 @@ function WorkspaceScreen({
                               if (action === 'schedule' && isInbound) {
                                 setActionScope('global');
                                 clearUndoEntries(); setScheduleStepperOpen(true);
-                              } else if (action === 'reroute' && isInbound) {
-                                setActionScope('global');
-                                clearUndoEntries(); setRerouteStepperOpen(true);
                               } else if (action === 'emrr-progress') {
                                 setActionScope('global');
                                 setActiveAction('emrr-progress');
@@ -2656,7 +2652,7 @@ function WorkspaceScreen({
                                               onClick={() => {
                                                 setSelectedRows(new Set([row.id]));
                                                 setActionScope('selected');
-                                                setResearchReason(undefined);
+                                                setResearchReason('member_verify');
                                                 setActiveAction('research');
                                               }}
                                             >
@@ -3605,22 +3601,6 @@ function WorkspaceScreen({
             onSiteAccessTypeChange={setSiteAccessType}
             paymentInfo={paymentInfo}
             onPaymentInfoChange={setPaymentInfo}
-            countPerMethod={cpm}
-          />
-        );
-      })()}
-
-      {/* ── Reroute Stepper (inbound only) ── */}
-      {rerouteStepperOpen && (() => {
-        const source = actionScope === 'global' ? requestRows : requestRows.filter(r => selectedRows.has(r.id));
-        const cpm = source.reduce((acc, r) => { acc[r.rowMethod] = (acc[r.rowMethod] || 0) + 1; return acc; }, {} as Record<string, number>);
-        return (
-          <RerouteStepperModal
-            methodSteps={['Offsite', 'Onsite', 'EMRR']}
-            onClose={() => setRerouteStepperOpen(false)}
-            onStepComplete={(method, skipped) => {
-              if (!skipped) rerouteMethodStep(method);
-            }}
             countPerMethod={cpm}
           />
         );
