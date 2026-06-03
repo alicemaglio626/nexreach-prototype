@@ -2777,7 +2777,7 @@ function WorkspaceScreen({
                     const uniquePlans = [...new Set(requestRows.map(r => r.plan))];
                     const lastCall = CALL_HISTORY_ROWS[0];
                     const showUnifiedCard = (retrievalMethod === 'offsite' || retrievalMethod === 'onsite' || isInbound);
-                    const showPends = isInbound;
+                    const showPends = false; // PENDS card cut from snapshot
                     const isOffsiteOrOnsite = retrievalMethod === 'offsite' || retrievalMethod === 'onsite';
                     const gridCols = showPends
                       ? '1fr 1px 1fr 1px 1fr'
@@ -3280,9 +3280,6 @@ function WorkspaceScreen({
                                   } else if (isInbound && tableAction === 'schedule' && !filteredToSingleMethod) {
                                     setTableAction(null);
                                     clearUndoEntries(); setScheduleStepperOpen(true);
-                                  } else if (isInbound && tableAction === 'reroute' && !filteredToSingleMethod) {
-                                    setTableAction(null);
-                                    clearUndoEntries(); setRerouteStepperOpen(true);
                                   } else {
                                     setActiveAction(tableAction as ActionType);
                                     setTableAction(null);
