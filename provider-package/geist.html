@@ -72,9 +72,9 @@
   /* due date carries urgency via a heavy outline, not a color fill */
   .summary .due{
     margin-left:auto; border:2.5px solid var(--ink); border-radius:var(--radius);
-    padding:6px 12px; line-height:1.15;
+    padding:6px 14px; display:flex; align-items:baseline; gap:10px;
   }
-  .summary .due .lbl{ font-weight:700; font-size:12pt; letter-spacing:.4px; text-transform:uppercase; }
+  .summary .due .lbl{ font-weight:700; font-size:12pt; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; }
   .summary .due .val{ font-weight:700; font-size:14pt; }
 
   /* ===================== INCLUDE BANNER (outlined, no fill) ===================== */
