@@ -22,7 +22,7 @@
     --ink:#000;
     --rule:#000;
     --radius:5px;
-    --pad:0.4in;
+    --pad:0.5in;
     --font: Arial, Helvetica, sans-serif;   /* fax spec: Arial */
   }
 
@@ -61,8 +61,9 @@
   /* ===================== SUMMARY BAR ===================== */
   .summary{
     display:flex; gap:28px; align-items:baseline; flex-wrap:nowrap;
-    padding:5px 0; font-size:12pt;
+    padding:3px 0; font-size:12pt;
   }
+  .summary .item{ white-space:nowrap; }
   .summary .item .lbl{ font-weight:700; }
   /* Datavant ID — 14pt floor */
   .dv-id{ font-size:14pt; font-weight:700; white-space:nowrap; }
@@ -75,30 +76,30 @@
   /* ===================== INCLUDE BANNER (outlined, no fill) ===================== */
   .banner{
     border:1.5px solid var(--ink); border-radius:var(--radius);
-    text-align:center; font-weight:700; font-size:12pt; line-height:1.25; letter-spacing:0; white-space:nowrap;
+    text-align:center; font-weight:700; font-size:11.5pt; line-height:1.25; letter-spacing:0; white-space:nowrap;
     padding:5px 8px; margin:4px 0;
   }
 
   /* ===================== TWO-COLUMN BODY ===================== */
   .cols{ display:flex; gap:24px; }
   .col{ flex:1; min-width:0; }
-  /* cover spacing — tuned to fit US Letter (one page) while staying balanced */
-  .cover .banner{ margin-bottom:8px; }
-  .cover .cols{ gap:34px; }
-  .cover .block{ margin-bottom:8px; line-height:1.28; }
-  .cover .delivery .block{ margin-bottom:4px; }
-  .cover .doc-head{ padding-bottom:6px; }
+  /* cover spacing — tightened to fit US Letter (one page) at 0.5in margins */
+  .cover .banner{ margin-bottom:6px; }
+  .cover .cols{ gap:30px; }
+  .cover .block{ margin-bottom:5px; line-height:1.22; }
+  .cover .delivery .block{ margin-bottom:3px; }
+  .cover .doc-head{ padding-bottom:4px; }
 
-  h2.section{ font-size:14pt; font-weight:700; margin:10px 0 6px; padding-top:8px; border-top:1.5px solid var(--rule); }
+  h2.section{ font-size:14pt; font-weight:700; margin:7px 0 4px; padding-top:5px; border-top:1.5px solid var(--rule); }
   h3.eyebrow{ font-size:12pt; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin:0 0 2px; }
   .block{ margin-bottom:6px; font-size:12pt; line-height:1.28; font-weight:400; }
-  .block p{ margin:0 0 3px; }
+  .block p{ margin:0 0 2px; }
   a{ color:var(--ink); font-weight:700; text-decoration:underline; word-break:break-word; }
-  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:3px; margin-top:3px; }
+  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:2px; margin-top:2px; }
 
   /* ===================== FOOTER ===================== */
   .page-foot{ margin-top:auto; }
-  .help{ border-top:1.5px solid var(--ink); padding-top:7px; margin-top:9px; }
+  .help{ border-top:1.5px solid var(--ink); padding-top:5px; margin-top:6px; }
   .help h2{ font-size:14pt; font-weight:700; margin:0 0 3px; }
   .help p{ font-size:12pt; margin:0 0 4px; }
   .help p:last-child{ margin:0; }
@@ -160,8 +161,8 @@
 
   <div class="summary">
     <div class="item"><span class="lbl">Provider Package ID:</span> <span class="dv-id">HG-EIDV2482-3</span></div>
-    <div class="item"><span class="lbl">Total Requests:</span> <span class="count">8</span></div>
-    <div class="due">Action Requested by <span class="date">5/1/2026</span></div>
+    <div class="item"><span class="lbl">Requests:</span> <span class="count">8</span></div>
+    <div class="due">Action Requested: <span class="date">5/1/2026</span></div>
   </div>
 
   <div class="banner">WHEN SENDING RECORDS, INVOICES, OR CORRESPONDENCE, INCLUDE THIS PAGE.</div>
@@ -238,8 +239,8 @@
 
   <div class="summary">
     <div class="item"><span class="lbl">Provider Package ID:</span> <span class="dv-id">HG-EIDV2482-3</span></div>
-    <div class="item"><span class="lbl">Total Requests:</span> <span class="count">8</span></div>
-    <div class="due">Action Requested by <span class="date">5/1/2026</span></div>
+    <div class="item"><span class="lbl">Requests:</span> <span class="count">8</span></div>
+    <div class="due">Action Requested: <span class="date">5/1/2026</span></div>
   </div>
 
   <div class="banner">WHEN SENDING RECORDS, INVOICES, OR CORRESPONDENCE, INCLUDE THIS PAGE.</div>
