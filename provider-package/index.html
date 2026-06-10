@@ -131,7 +131,8 @@
   @media print{
     html,body{ background:#fff; }
     .toolbar{ display:none; }
-    .page{ margin:0; box-shadow:none; width:auto; min-height:0; height:auto; padding:var(--pad); page-break-after:always; break-after:page; }
+    /* fill the sheet so .page-foot (margin-top:auto) pins to the bottom of every printed page */
+    .page{ margin:0; box-shadow:none; width:auto; min-height:10.9in; height:auto; padding:var(--pad); page-break-after:always; break-after:page; }
     .page:last-child{ page-break-after:auto; break-after:auto; }
   }
 </style>
