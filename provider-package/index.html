@@ -84,20 +84,19 @@
   .cols{ display:flex; gap:24px; }
   .col{ flex:1; min-width:0; }
   /* cover spacing — tightened to fit US Letter (one page) at 0.5in margins */
-  .cover .banner{ margin-bottom:6px; }
+  .cover .banner{ margin-bottom:4px; }
   .cover .cols{ gap:30px; }
-  .cover .block{ margin-bottom:5px; line-height:1.22; }
-  .cover .delivery .block{ margin-bottom:3px; }
-  .cover .doc-head{ padding-bottom:4px; }
+  .cover .block{ margin-bottom:4px; line-height:1.22; }
+  .cover .delivery .block{ margin-bottom:2px; }
+  .cover .doc-head{ padding-bottom:3px; }
 
-  h2.section{ font-size:14pt; font-weight:700; margin:7px 0 4px; padding-top:5px; border-top:1.5px solid var(--rule); }
+  h2.section{ font-size:14pt; font-weight:700; margin:5px 0 3px; padding-top:4px; border-top:1.5px solid var(--rule); }
   h3.eyebrow{ font-size:12pt; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin:0 0 2px; }
   .block{ margin-bottom:6px; font-size:12pt; line-height:1.28; font-weight:400; }
   .block p{ margin:0 0 2px; }
   a{ color:var(--ink); font-weight:700; text-decoration:underline; word-break:break-word; }
-  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:6px; margin-top:6px; }
-  .cover .delivery .col:first-child{ flex:1.45; }
-  .cover .delivery .col:last-child{ flex:0.9; }
+  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:5px; margin-top:5px; }
+  .cover .delivery .col{ flex:1; }
 
   /* ===================== FOOTER ===================== */
   .page-foot{ margin-top:auto; }
@@ -199,18 +198,18 @@
       <h3 class="eyebrow">Secure Provider Portal (Recommended)</h3>
       <div class="block">
         <p>Securely respond to Datavant-managed requests in a single, up-to-date queue. Log in or sign up here: <a href="#">secureupload.datavant.com</a></p>
-        <p>Or upload records using a secure one-time login:<br>User: <b>PP-EIDV-2482</b><br>Password: <b>nm4allvez1</b></p>
+        <p>Or upload records using a secure one-time login:<br>User: <b>PP-EIDV-2482</b> &nbsp; Password: <b>nm4allvez1</b></p>
       </div>
-      <h3 class="eyebrow">Remote EMR Retrieval</h3>
-      <div class="block"><p>Set up a secure remote connection from an EMR directly to Datavant for timely remote retrieval by trained Datavant associates. Contact: 1-877-445-9293</p></div>
-      <h3 class="eyebrow">Onsite Retrieval</h3>
-      <div class="block"><p>Schedule on-site retrieval with a complimentary Datavant Chart Retrieval Specialist, or review any aspects of the on-site retrieval services at Datavant. Contact: 1-877-445-9293</p></div>
-    </div>
-    <div class="col">
       <h3 class="eyebrow">Fax</h3>
       <div class="block"><p>Send secure faxes to: <b style="font-size:14pt;">1-972-854-7413</b></p></div>
       <h3 class="eyebrow">Mail</h3>
       <div class="block"><p>Mark the envelope Confidential and mail to:<br>Datavant<br>222 W. Dunlap Ave<br>Phoenix, AZ 85021</p></div>
+    </div>
+    <div class="col">
+      <h3 class="eyebrow">Remote EMR Retrieval</h3>
+      <div class="block"><p>Set up a secure remote connection from an EMR directly to Datavant for timely remote retrieval by trained Datavant associates. Contact: 1-877-445-9293</p></div>
+      <h3 class="eyebrow">Onsite Retrieval</h3>
+      <div class="block"><p>Schedule on-site retrieval with a complimentary Datavant Chart Retrieval Specialist, or review any aspects of the on-site retrieval services at Datavant. Contact: 1-877-445-9293</p></div>
     </div>
   </div>
 
