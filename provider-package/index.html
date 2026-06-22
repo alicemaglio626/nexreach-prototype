@@ -83,24 +83,25 @@
   /* ===================== TWO-COLUMN BODY ===================== */
   .cols{ display:flex; gap:24px; }
   .col{ flex:1; min-width:0; }
-  /* cover spacing — tightened to fit US Letter (one page) at 0.5in margins */
-  .cover .banner{ margin-bottom:4px; }
+  /* cover spacing — relaxed to use the available vertical space; still one US Letter page at 0.5in margins */
+  .cover .banner{ margin:6px 0 20px; }
   .cover .cols{ gap:30px; }
-  .cover .block{ margin-bottom:4px; line-height:1.22; }
-  .cover .delivery .block{ margin-bottom:2px; }
-  .cover .doc-head{ padding-bottom:3px; }
+  .cover .block{ margin-bottom:7px; line-height:1.27; }
+  .cover .delivery .block{ margin-bottom:5px; }
+  .cover .doc-head{ padding-bottom:5px; }
 
-  h2.section{ font-size:14pt; font-weight:700; margin:5px 0 3px; padding-top:4px; border-top:1.5px solid var(--rule); }
+  /* Delivery Information rule: equal gap above and below the divider */
+  h2.section{ font-size:14pt; font-weight:700; margin:11px 0 6px; padding-top:11px; border-top:1.5px solid var(--rule); }
   h3.eyebrow{ font-size:12pt; font-weight:700; letter-spacing:.5px; text-transform:uppercase; margin:0 0 2px; }
   .block{ margin-bottom:6px; font-size:12pt; line-height:1.28; font-weight:400; }
   .block p{ margin:0 0 2px; }
   a{ color:var(--ink); font-weight:700; text-decoration:underline; word-break:break-word; }
-  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:9px; margin-top:9px; }
+  .delivery h3.eyebrow:not(:first-of-type){ border-top:1.5px solid var(--rule); padding-top:11px; margin-top:11px; }
   .cover .delivery .col{ flex:1; }
 
   /* ===================== FOOTER ===================== */
   .page-foot{ margin-top:auto; }
-  .help{ border-top:1.5px solid var(--ink); padding-top:5px; margin-top:6px; }
+  .help{ border-top:1.5px solid var(--ink); padding-top:12px; margin-top:6px; }
   .help h2{ font-size:14pt; font-weight:700; margin:0 0 3px; }
   .help p{ font-size:12pt; margin:0 0 4px; }
   .help p:last-child{ margin:0; }
@@ -200,14 +201,14 @@
         <p>Securely respond to Datavant-managed requests in a single, up-to-date queue. Log in or sign up here: <a href="#">secureupload.datavant.com</a></p>
         <p>Or upload records using a secure one-time login<br>User: <b>PP-EIDV-2482</b> &nbsp; Password: <b>nm4allvez1</b></p>
       </div>
+      <h3 class="eyebrow">Remote EMR Retrieval</h3>
+      <div class="block"><p>Set up a secure remote connection from an EMR directly to Datavant for timely remote retrieval by trained Datavant associates. Contact: 1-877-445-9293</p></div>
+    </div>
+    <div class="col">
       <h3 class="eyebrow">Fax</h3>
       <div class="block"><p>Send secure faxes to: <b style="font-size:14pt;">1-972-854-7413</b></p></div>
       <h3 class="eyebrow">Mail</h3>
       <div class="block"><p>Mark the envelope Confidential and mail to:<br>Datavant<br>222 W. Dunlap Ave<br>Phoenix, AZ 85021</p></div>
-    </div>
-    <div class="col">
-      <h3 class="eyebrow">Remote EMR Retrieval</h3>
-      <div class="block"><p>Set up a secure remote connection from an EMR directly to Datavant for timely remote retrieval by trained Datavant associates. Contact: 1-877-445-9293</p></div>
       <h3 class="eyebrow">Onsite Retrieval</h3>
       <div class="block"><p>Schedule on-site retrieval with a complimentary Datavant Chart Retrieval Specialist, or review any aspects of the on-site retrieval services at Datavant. Contact: 1-877-445-9293</p></div>
     </div>
@@ -216,7 +217,7 @@
   <div class="page-foot">
     <div class="help">
       <h2>Have Questions?</h2>
-      <p>Call <b>(877) 445-9293</b> or email <a href="#">chartreview@datavant.com</a> and reference Provider Package ID <b>HG-EIDV2482</b>.</p>
+      <p>Call <b>(877) 445-9293</b> or email <a href="#">chartreview@datavant.com</a> and reference <b>HG-EIDV2482</b>.</p>
       <p>Datavant can help remove the burden of fulfilling record requests through one of our NO COST retrieval options — visit <a href="#">datavant.com/campaign/betterway</a> to learn more.</p>
     </div>
     <div class="pageno">Cover Page 1/1</div>
