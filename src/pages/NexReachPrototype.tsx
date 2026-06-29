@@ -23,6 +23,7 @@ import {
   Select,
   Radio,
   Alert,
+  SegmentedControl,
 } from '@datavant/dart';
 import {
   IconSearch,
@@ -41,7 +42,6 @@ import {
   IconCheck,
   IconAlertTriangle,
   IconArrowRight,
-  IconUpload,
 } from '@tabler/icons-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1882,9 +1882,12 @@ function WorkspaceScreen({
   const [queueClearWarn, setQueueClearWarn] = useState<null | { count: number; run: () => void }>(null);
   const [pasteInput, setPasteInput] = useState('');
   const [pastePage, setPastePage] = useState(0);
+  // Search toolbar mode: 'search' = fuzzy field search; 'idlist' = exact bulk ID lookup
+  const [searchMode, setSearchMode] = useState<'search' | 'idlist'>('search');
+  const [idListDraft, setIdListDraft] = useState('');
+  const idCsvRef = useRef<HTMLInputElement | null>(null);
   const [pasteSource, setPasteSource] = useState<'paste' | 'csv'>('paste');
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
-  const csvInputRef = useRef<HTMLInputElement | null>(null);
   const [unmatchedModalOpen, setUnmatchedModalOpen] = useState(false);
   const unmatchedIdsRef = useRef<string[]>([]);
   const PASTE_PAGE_SIZE = 20;
@@ -3100,12 +3103,7 @@ function WorkspaceScreen({
                   {/* Bulk Actions — apply to all RRs in this retrieval unit (moved here from Verification) */}
                   <Box mb="md" style={{ border: '1px solid var(--graphic-contrast-low)', borderRadius: 8, padding: '14px 20px' }}>
                     <Group justify="space-between" align="center" mb={10} wrap="wrap" gap={8}>
-                      <Group gap={8} align="baseline">
-                        <Text fw={700} style={{ fontSize: 15, color: 'var(--text-contrast-high)' }}>Bulk Actions</Text>
-                        <Text size="xs" style={{ color: 'var(--text-contrast-minimum)' }}>
-                          Applies to all <Text component="span" fw={600} style={{ color: 'var(--text-contrast-high)' }}>{TOTAL_RR_COUNT.toLocaleString()} RRs</Text> in this retrieval unit
-                        </Text>
-                      </Group>
+                      <Text fw={700} style={{ fontSize: 15, color: 'var(--text-contrast-high)' }}>Bulk Actions</Text>
                     </Group>
                     <Group gap={6} wrap="wrap">
                       {((!isInbound && isEmrRemote)
@@ -3136,97 +3134,115 @@ function WorkspaceScreen({
                     </Group>
                   </Box>
 
-                  {/* Search bar + filter pills. Multi-line paste auto-switches to bulk-match mode. */}
+                  {/* Search toolbar — explicit mode switch: fuzzy Search vs. exact ID-list lookup */}
                   {(() => {
-                    const isPasteMode = pasteInput.trim() !== '';
-                    const detectAndIngestPaste = (text: string) => {
-                      const tokens = text.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
-                      const looksLikeList = /[\n\r]/.test(text) || (tokens.length > 1 && /[,;]/.test(text));
-                      if (looksLikeList && tokens.length > 1) {
-                        setPasteInput(text);
-                        setPastePage(0);
-                        setSearchViewQuery('');
-                        setSearchViewInput('');
-                        setPasteSource('paste');
-                        setCsvFileName(null);
-                        return true;
-                      }
-                      return false;
+                    const runSearch = () => setSearchViewQuery(searchViewInput.trim());
+                    const idListIds = Array.from(new Set(idListDraft.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean)));
+                    const runIdListSearch = () => {
+                      if (idListIds.length === 0) return;
+                      setPasteInput(idListIds.join('\n'));
+                      setPasteSource(csvFileName ? 'csv' : 'paste');
+                      setPastePage(0);
+                      setSearchViewQuery('');
+                      setSearchViewInput('');
                     };
-                    // Paste stages the IDs in the field; matching only runs on Search/Enter.
-                    const runSearch = () => {
-                      if (!detectAndIngestPaste(searchViewInput)) setSearchViewQuery(searchViewInput.trim());
-                    };
-                    const handleCsvFile = (file: File) => {
+                    const handleIdCsv = (file: File) => {
                       const reader = new FileReader();
                       reader.onload = (ev) => {
                         const text = String(ev.target?.result ?? '');
                         const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-                        // Skip header row if first cell isn't numeric/ID-like
                         const firstCell = (lines[0] || '').split(',')[0].trim();
                         const startIdx = /^[0-9A-Z-]+$/i.test(firstCell) && firstCell.length >= 6 ? 0 : 1;
                         const ids = lines.slice(startIdx).map(l => l.split(',')[0].trim()).filter(Boolean);
                         if (ids.length === 0) return;
-                        setPasteInput(ids.join('\n'));
-                        setPasteSource('csv');
+                        setIdListDraft(ids.join('\n'));
                         setCsvFileName(file.name);
-                        setPastePage(0);
-                        setSearchViewQuery('');
-                        setSearchViewInput('');
+                        setPasteSource('csv');
                       };
                       reader.readAsText(file);
                     };
+                    // Switching modes clears the other mode's committed query so the table always matches the visible mode
+                    const switchMode = (m: 'search' | 'idlist') => {
+                      setSearchMode(m);
+                      if (m === 'search') { setPasteInput(''); setIdListDraft(''); setCsvFileName(null); }
+                      else { setSearchViewQuery(''); setSearchViewInput(''); }
+                    };
+                    // Shared inner controls so both demo variants stay in sync
+                    const keywordInner = (
+                      <>
+                        <input
+                          placeholder="Search by Member Name, Practitioner Name, or Site…"
+                          value={searchViewInput}
+                          onChange={(e) => setSearchViewInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
+                          style={{ border: 'none', outline: 'none', fontSize: 14, width: '100%', color: 'var(--text-contrast-low)', background: 'transparent', fontFamily: 'DM Sans, sans-serif' }}
+                        />
+                        {searchViewInput && (
+                          <IconX size={15} color="var(--text-contrast-minimum)" style={{ flexShrink: 0, cursor: 'pointer' }} onClick={() => { setSearchViewInput(''); setSearchViewQuery(''); }} />
+                        )}
+                        <IconSearch size={16} color="var(--text-contrast-minimum)" style={{ flexShrink: 0, cursor: 'pointer' }} onClick={runSearch} aria-label="Search" />
+                      </>
+                    );
+                    const idListInner = (
+                      <>
+                        <textarea
+                          placeholder="Paste RR IDs — separate with commas, spaces, or new lines"
+                          value={idListDraft}
+                          onChange={(e) => { setIdListDraft(e.currentTarget.value); if (csvFileName) setCsvFileName(null); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) runIdListSearch(); }}
+                          rows={3}
+                          style={{ border: 'none', outline: 'none', resize: 'none', flex: 1, minWidth: 0, boxSizing: 'border-box', height: 60, padding: 0, fontSize: 14, color: 'var(--text-contrast-low)', background: 'transparent', fontFamily: 'DM Sans, sans-serif', lineHeight: '20px', overflowY: 'auto' }}
+                        />
+                        {(idListDraft || pasteInput) && (
+                          <IconX size={15} color="var(--text-contrast-minimum)" style={{ flexShrink: 0, cursor: 'pointer' }} onClick={() => { setIdListDraft(''); setCsvFileName(null); setPasteInput(''); }} />
+                        )}
+                      </>
+                    );
+                    // Both wrappers share identical inset/centering so placeholder text aligns the same in either mode
+                    const keywordWrap = (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px 0 10px', flex: 1, minWidth: 0 }}>{keywordInner}</div>
+                    );
+                    const idListWrap = (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, padding: '8px 8px 8px 10px', flex: 1, minWidth: 0 }}>{idListInner}</div>
+                    );
+                    // Keyword searches via Enter + the in-field magnifier (no standalone button).
+                    // RR ID list needs explicit triggers (a paste box has no inline submit).
+                    const idListActions = (
+                      <>
+                        <Button intent="prominent" appearance="solid" size="sm" disabled={idListIds.length === 0} onClick={runIdListSearch}>
+                          Search {idListIds.length.toLocaleString()} ID{idListIds.length === 1 ? '' : 's'}
+                        </Button>
+                        <Button intent="neutral" appearance="ghost" size="sm" onClick={() => idCsvRef.current?.click()}>Upload CSV</Button>
+                      </>
+                    );
                     return (
                       <Box mb="md">
-                        <input
-                          ref={csvInputRef}
-                          type="file"
-                          accept=".csv,text/csv"
-                          style={{ display: 'none' }}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleCsvFile(f);
-                            e.target.value = '';
-                          }}
-                        />
-                        <Group justify="space-between" align="flex-start" wrap="nowrap">
-                          <Group gap={8} align="center" wrap="nowrap" style={{ flexShrink: 0 }}>
-                            <Box style={{ display: 'flex', alignItems: 'center', gap: 4, border: '1px solid var(--graphic-contrast-medium)', borderRadius: 6, padding: '6px 12px', paddingRight: 8, backgroundColor: 'var(--background-contrast-none)', width: 440 }}>
-                              <input
-                                placeholder="Search or paste a list of RR IDs"
-                                value={searchViewInput}
-                                onChange={(e) => setSearchViewInput(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') runSearch(); }}
-                                onPaste={(e) => {
-                                  // Stage a pasted list in the field (normalized) — don't match until Search/Enter
-                                  const text = e.clipboardData.getData('text');
-                                  const tokens = text.split(/[\s,;]+/).map(t => t.trim()).filter(Boolean);
-                                  const isList = (/[\n\r]/.test(text) || /[,;]/.test(text)) && tokens.length > 1;
-                                  if (isList) { e.preventDefault(); setSearchViewInput(tokens.join(', ')); }
-                                }}
-                                style={{ border: 'none', outline: 'none', fontSize: 14, width: '100%', color: 'var(--text-contrast-low)', background: 'transparent', fontFamily: 'DM Sans, sans-serif' }}
-                              />
-                              <IconSearch size={16} color="var(--text-contrast-minimum)" style={{ flexShrink: 0, cursor: 'pointer' }} onClick={runSearch} />
+                        <input ref={idCsvRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleIdCsv(f); e.target.value = ''; }} />
+
+                        {/* Two-column panel: search module on the left, filters on the right.
+                            Left stacks scope toggle over the field; Search stays inline with the field.
+                            DART SegmentedControl scopes only THIS field, not the table or filters. */}
+                        <Group justify="space-between" align="flex-start" wrap="nowrap" gap="xl">
+                          {/* LEFT — search module */}
+                          <Stack gap={8} align="flex-start" style={{ flexShrink: 0 }}>
+                            <SegmentedControl
+                              size="sm"
+                              value={searchMode}
+                              onChange={(v) => switchMode(v as 'search' | 'idlist')}
+                              data={[{ label: 'Keyword', value: 'search' }, { label: 'RR ID list', value: 'idlist' }]}
+                            />
+                            <Box style={{ display: 'flex', alignItems: searchMode === 'idlist' ? 'flex-start' : 'center', border: '1px solid var(--graphic-contrast-medium)', borderRadius: 6, backgroundColor: 'var(--background-contrast-none)', width: 440, height: searchMode === 'idlist' ? 76 : 36, overflow: 'hidden' }}>
+                              {searchMode === 'search' ? keywordWrap : idListWrap}
                             </Box>
-                            <Button
-                              intent="prominent"
-                              appearance="solid"
-                              size="sm"
-                              onClick={runSearch}
-                            >
-                              Search
-                            </Button>
-                            <Button
-                              intent="prominent"
-                              appearance="outline"
-                              size="sm"
-                              leftSection={<IconUpload size={14} />}
-                              onClick={() => csvInputRef.current?.click()}
-                            >
-                              Upload CSV
-                            </Button>
-                          </Group>
-                          <Group gap={8} align="center" wrap="wrap" justify="flex-end">
+                            {searchMode === 'idlist' && (
+                              <Group gap={8} align="center" wrap="nowrap">
+                                {idListActions}
+                              </Group>
+                            )}
+                          </Stack>
+                          {/* RIGHT — filters, offset to line up with the top of the search box (below the toggle) */}
+                          <Group gap={8} align="center" wrap="nowrap" justify="flex-end" style={{ marginTop: 38 }}>
                             <FilterPill label="Project Due Date" options={['4/1/2026', '5/1/2026', '6/1/2026']} selected={searchViewFilters['Project Due Date']} onToggle={(opt) => toggleSearchViewFilter('Project Due Date', opt)} />
                             <FilterPill label="Commitment Date" options={['No Date', '3/1/2026', '4/1/2026', '5/1/2026']} selected={searchViewFilters['Commitment Date']} onToggle={(opt) => toggleSearchViewFilter('Commitment Date', opt)} />
                             <FilterPill label="Status" options={isInbound
@@ -3235,7 +3251,7 @@ function WorkspaceScreen({
                             } selected={searchViewFilters['Status']} onToggle={(opt) => toggleSearchViewFilter('Status', opt)} />
                             <FilterPill label="Provider" options={PROVIDERS} selected={searchViewFilters['Provider']} onToggle={(opt) => toggleSearchViewFilter('Provider', opt)} />
                             {isInbound && <FilterPill label="Retrieval Method" options={['Offsite', 'Onsite', 'EMRR']} selected={searchViewFilters['Retrieval Method']} onToggle={(opt) => toggleSearchViewFilter('Retrieval Method', opt)} />}
-                            <Box onClick={resetSearchView} style={{ border: '1px solid var(--graphic-contrast-medium)', borderRadius: 1000, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                            <Box onClick={resetSearchView} style={{ border: '1px solid var(--graphic-contrast-medium)', borderRadius: 1000, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }} title="Reset filters">
                               <IconRefresh size={16} color="var(--text-contrast-low)" />
                             </Box>
                           </Group>
@@ -3471,7 +3487,7 @@ function WorkspaceScreen({
                                 const canUndoRow = isActioned && row.rowMethod !== 'Onsite';
                                 const isSelected = selectedRows.has(row.id);
                                 return (
-                                  <Table.Tr key={row.id} style={{ borderBottom: '1px solid var(--graphic-contrast-low)', backgroundColor: isSelected ? 'var(--background-status-info)' : undefined }}>
+                                  <Table.Tr key={row.id} style={{ borderBottom: '1px solid var(--graphic-contrast-low)' }}>
                                     <Table.Td style={{ padding: '8px', width: 40 }}>
                                       {isActioned && !(isInbound && row.status === 'Pended') ? (
                                         canUndoRow ? (
