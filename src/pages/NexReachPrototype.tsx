@@ -997,7 +997,7 @@ function OnsiteScheduleModal({ count, scheduledCount = 0, onClose, onSubmit, onS
 
           {/* Inline standardized-address suggestion (replaces modal-over-modal) */}
           {addrDiffers && addrResolution === 'pending' && (
-            <Box style={{ border: '1px solid var(--graphic-status-info)', background: 'var(--background-status-info)', borderRadius: 8, padding: '12px 14px' }}>
+            <Box style={{ border: '1px solid var(--graphic-data-blue)', background: 'var(--background-data-blue)', borderRadius: 8, padding: '12px 14px' }}>
               <Group gap={10} align="flex-start" wrap="nowrap">
                 <IconInfoCircle size={17} color="var(--text-data-blue)" style={{ marginTop: 1, flexShrink: 0 }} />
                 <Box style={{ flex: 1 }}>
@@ -1618,10 +1618,10 @@ function ScheduleStepperModal({ methodSteps, onClose, onStepComplete, siteAccess
         </div>
 
         {/* Info banner */}
-        <div style={{ backgroundColor: 'var(--background-status-info)', borderBottom: '1px solid var(--graphic-status-info)', padding: '10px 24px' }}>
+        <div style={{ backgroundColor: 'var(--background-data-blue)', borderBottom: '1px solid var(--graphic-data-blue)', padding: '10px 24px' }}>
           <Group gap={8} align="center">
-            <IconInfoCircle size={15} color="var(--graphic-status-info)" />
-            <Text size="sm" fw={600} style={{ color: 'var(--text-status-info)' }}>
+            <IconInfoCircle size={15} color="var(--graphic-data-blue)" />
+            <Text size="sm" fw={600} style={{ color: 'var(--text-data-blue)' }}>
               Step {step + 1} of {totalSteps} — {currentMethod} · {count.toLocaleString()} Record Requests
             </Text>
           </Group>
@@ -1718,10 +1718,10 @@ function RerouteStepperModal({ methodSteps, onClose, onStepComplete, countPerMet
               </Group>
             </div>
             {/* Info banner */}
-            <div style={{ backgroundColor: 'var(--background-status-info)', borderBottom: '1px solid var(--graphic-status-info)', padding: '10px 24px' }}>
+            <div style={{ backgroundColor: 'var(--background-data-blue)', borderBottom: '1px solid var(--graphic-data-blue)', padding: '10px 24px' }}>
               <Group gap={8} align="center">
-                <IconInfoCircle size={15} color="var(--graphic-status-info)" />
-                <Text size="sm" fw={600} style={{ color: 'var(--text-status-info)' }}>Step {step + 1} of {totalSteps} — {currentMethod} · {count.toLocaleString()} Record Requests</Text>
+                <IconInfoCircle size={15} color="var(--graphic-data-blue)" />
+                <Text size="sm" fw={600} style={{ color: 'var(--text-data-blue)' }}>Step {step + 1} of {totalSteps} — {currentMethod} · {count.toLocaleString()} Record Requests</Text>
               </Group>
             </div>
             {/* Body */}
@@ -2199,7 +2199,7 @@ function WorkspaceScreen({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', zIndex: 10,
               }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--background-status-info)'; }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--background-data-blue)'; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--text-contrast-inverse)'; }}
             >
               <IconChevronRight size={14} color="var(--text-data-blue)" />
@@ -2219,7 +2219,7 @@ function WorkspaceScreen({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer', zIndex: 10,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--background-status-info)'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--background-data-blue)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--text-contrast-inverse)'; }}
             >
               <IconChevronLeft size={14} color="var(--text-data-blue)" />
@@ -2299,7 +2299,7 @@ function WorkspaceScreen({
                         Connected
                       </Box>
                       <Group gap={4} style={{ cursor: 'pointer' }} onClick={handleChangeAnswer}>
-                        <IconRotateClockwise size={13} color="var(--text-status-info)" />
+                        <IconRotateClockwise size={13} color="var(--text-data-blue)" />
                         <Text size="sm" style={{ color: 'var(--text-data-blue)' }}>Change Answer</Text>
                       </Group>
                     </Group>
@@ -2309,7 +2309,7 @@ function WorkspaceScreen({
                         Not Connected
                       </Box>
                       <Group gap={4} style={{ cursor: 'pointer' }} onClick={handleChangeAnswer}>
-                        <IconRotateClockwise size={13} color="var(--text-status-info)" />
+                        <IconRotateClockwise size={13} color="var(--text-data-blue)" />
                         <Text size="sm" style={{ color: 'var(--text-data-blue)' }}>Change Answer</Text>
                       </Group>
                     </Group>
