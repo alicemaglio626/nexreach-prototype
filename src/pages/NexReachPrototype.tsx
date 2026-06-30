@@ -3209,10 +3209,10 @@ function WorkspaceScreen({
                     // RR ID list needs explicit triggers (a paste box has no inline submit).
                     const idListActions = (
                       <>
-                        <Button intent="prominent" appearance="solid" size="sm" disabled={idListIds.length === 0} onClick={runIdListSearch}>
+                        <Button intent="prominent" appearance="solid" size="xs" disabled={idListIds.length === 0} onClick={runIdListSearch}>
                           Search {idListIds.length.toLocaleString()} ID{idListIds.length === 1 ? '' : 's'}
                         </Button>
-                        <Button intent="neutral" appearance="ghost" size="sm" onClick={() => idCsvRef.current?.click()}>Upload CSV</Button>
+                        <Button intent="neutral" appearance="ghost" size="xs" onClick={() => idCsvRef.current?.click()}>Upload CSV</Button>
                       </>
                     );
                     return (
