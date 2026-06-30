@@ -3212,7 +3212,7 @@ function WorkspaceScreen({
                         <Button intent="prominent" appearance="solid" size="xs" disabled={idListIds.length === 0} onClick={runIdListSearch}>
                           Search {idListIds.length.toLocaleString()} ID{idListIds.length === 1 ? '' : 's'}
                         </Button>
-                        <Button intent="neutral" appearance="ghost" size="xs" onClick={() => idCsvRef.current?.click()}>Upload CSV</Button>
+                        <Button intent="prominent" appearance="ghost" size="xs" onClick={() => idCsvRef.current?.click()}>Upload CSV</Button>
                       </>
                     );
                     return (
