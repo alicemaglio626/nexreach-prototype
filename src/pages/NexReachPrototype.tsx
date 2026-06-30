@@ -166,12 +166,28 @@ const METHOD_ORDER = ['Offsite', 'Onsite'];
 const SURFACED_PEND_CODES = ['PNP1', 'PNP5', 'PNP24'] as const;
 type PendCode = typeof SURFACED_PEND_CODES[number] | null;
 
+// Sanitized (PHI-free) QA-rejection reasons surfaced to agents. The full reason travels in the provider package.
+const QA_REASONS = [
+  'Missing date of service',
+  'Wrong member',
+  'Labs only — progress notes missing',
+  'Missing demographics',
+  'Illegible pages',
+];
+
 const REQUEST_ROWS = PROVIDERS.flatMap((practitioner, providerIdx) =>
   Array.from({ length: 5 }, (_, i) => {
     const flatIdx = providerIdx * 5 + i;
     // Seed some Pended rows with specific PNP codes (rotates through 10-slot pattern)
     const statusSlot = ['Past Due', 'Pended:PNP24', 'New', 'Past Due', 'In Progress-Unblocked', 'Pended:PNP1', 'Past Due', 'Pended:PNP5', 'Scheduled', 'Past Due'][flatIdx % 10];
-    const isPended = statusSlot.startsWith('Pended:');
+    const isPendedSlot = statusSlot.startsWith('Pended:');
+    // QA Followup is its own actionable status (IN_PROGRESS / QA_FOLLOWUP_NEEDED). The structured
+    // reason rides alongside it and is shown via an info-icon tooltip next to the status.
+    const qaRejected = flatIdx % 11 === 3;
+    const qaReason: string | null = qaRejected
+      ? QA_REASONS[Math.floor(flatIdx / 11) % QA_REASONS.length]
+      : null;
+    const isPended = isPendedSlot && !qaRejected;
     const pendCode: PendCode = isPended ? (statusSlot.split(':')[1] as PendCode) : null;
     return {
       id: String(387216389 + flatIdx),
@@ -181,8 +197,10 @@ const REQUEST_ROWS = PROVIDERS.flatMap((practitioner, providerIdx) =>
       dob: `${String((flatIdx % 12) + 1).padStart(2, '0')}/${String((flatIdx % 28) + 1).padStart(2, '0')}/${1985 + (flatIdx % 15)}`,
       due: ['4/1/2026', '4/1/2026', '5/1/2026', '4/1/2026', '6/1/2026', '5/1/2026'][flatIdx % 6],
       commit: ['—', '—', '3/1/2026', '—', '4/1/2026', '5/1/2026', '—', '—', '3/1/2026', '—'][flatIdx % 10],
-      status: isPended ? 'Pended' : statusSlot,
+      status: qaRejected ? 'QA Followup' : (isPended ? 'Pended' : statusSlot),
       pendCode,
+      qaRejected,
+      qaReason,
       payment: '—',
       osRef: `87991820${9887 + flatIdx}`,
       practitioner,
@@ -310,12 +328,12 @@ function ModalOverlay({ title, submitLabel, onClose, onSubmit, children, size = 
   );
 }
 
-function ScheduleModal({ count, unblockedCount = 0, scheduledCount = 0, onClose, onSubmit, onSaveProgress }: { count: number; unblockedCount?: number; scheduledCount?: number; onClose: () => void; onSubmit?: (commitDate?: string, paymentRequired?: boolean, excludeScheduled?: boolean) => void; onSaveProgress?: () => void }) {
+function ScheduleModal({ count, unblockedCount = 0, scheduledCount = 0, defaultPaymentNo = false, onClose, onSubmit, onSaveProgress }: { count: number; unblockedCount?: number; scheduledCount?: number; defaultPaymentNo?: boolean; onClose: () => void; onSubmit?: (commitDate?: string, paymentRequired?: boolean, excludeScheduled?: boolean) => void; onSaveProgress?: () => void }) {
   const [activeTab, setActiveTab] = useState<'progress' | 'schedule'>('progress');
   const [showPendModal, setShowPendModal] = useState(false);
 
   // Progress Update fields
-  const [paymentRequired, setPaymentRequired] = useState<string | null>(null);
+  const [paymentRequired, setPaymentRequired] = useState<string | null>(defaultPaymentNo ? 'no' : null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [feesNotPerChart, setFeesNotPerChart] = useState(false);
   const [paymentTimeline, setPaymentTimeline] = useState('pre-pay');
@@ -625,13 +643,13 @@ function standardizeAddress(addr1: string, city: string, zip: string) {
   return { addr1: stdAddr1, city: city.trim().replace(/\s+/g, ' '), zip: zip.trim().slice(0, 5) };
 }
 
-function OnsiteScheduleModal({ count, scheduledCount = 0, onClose, onSubmit, onSaveProgress }: { count: number; scheduledCount?: number; onClose: () => void; onSubmit?: (status?: string, paymentRequired?: boolean, excludeScheduled?: boolean) => void; onSaveProgress?: () => void }) {
+function OnsiteScheduleModal({ count, scheduledCount = 0, defaultPaymentNo = false, onClose, onSubmit, onSaveProgress }: { count: number; scheduledCount?: number; defaultPaymentNo?: boolean; onClose: () => void; onSubmit?: (status?: string, paymentRequired?: boolean, excludeScheduled?: boolean) => void; onSaveProgress?: () => void }) {
   const [activeTab, setActiveTab] = useState<'progress' | 'schedule'>('progress');
   const [step, setStep] = useState<'form' | 'techScheduler' | 'notes' | 'noAvailability'>('form');
   const [schedulerOpened, setSchedulerOpened] = useState(false);
 
   // Progress Update fields (same as offsite)
-  const [paymentRequired, setPaymentRequired] = useState<string | null>(null);
+  const [paymentRequired, setPaymentRequired] = useState<string | null>(defaultPaymentNo ? 'no' : null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [feesNotPerChart, setFeesNotPerChart] = useState(false);
   const [paymentTimeline, setPaymentTimeline] = useState('pre-pay');
@@ -1833,7 +1851,7 @@ function WorkspaceScreen({
   // Method-scoped stepper actions — push a per-method undo entry instead of a single global one
   const scheduleMethodStep = (method: string) => {
     const eligible = requestRows.filter(r =>
-      ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status) && r.rowMethod === method
+      ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status) && r.rowMethod === method
     );
     if (eligible.length === 0) return;
     const rowsBefore = eligible.map(r => ({ ...r }));
@@ -1856,7 +1874,7 @@ function WorkspaceScreen({
   };
   const rerouteMethodStep = (sourceMethod: string) => {
     const eligible = requestRows.filter(r =>
-      ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status) && r.rowMethod === sourceMethod
+      ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status) && r.rowMethod === sourceMethod
     );
     if (eligible.length === 0) return;
     const rowsBefore = eligible.map(r => ({ ...r }));
@@ -2016,7 +2034,12 @@ function WorkspaceScreen({
     });
   };
 
-  const unactionedRows = requestRows.filter(r => (r.status === 'New' || r.status === 'Past Due' || r.status === 'In Progress-Unblocked') && !(isInbound && r.rowMethod === 'EMRR'));
+  const unactionedRows = requestRows.filter(r => (r.status === 'New' || r.status === 'Past Due' || r.status === 'In Progress-Unblocked' || r.status === 'QA Followup') && !(isInbound && r.rowMethod === 'EMRR'));
+
+  // Payment defaults to No for QA follow-ups (re-chase rarely requires payment). True only when the
+  // whole scheduling batch is QA Followup, so mixed batches don't wrongly default normal RTs to No.
+  const scheduleTargetRows = actionScope === 'global' ? unactionedRows : requestRows.filter(r => selectedRows.has(r.id));
+  const scheduleTargetsAllQa = scheduleTargetRows.length > 0 && scheduleTargetRows.every(r => r.status === 'QA Followup');
 
   const toggleAll = () => {
     if (selectedRows.size === unactionedRows.length && unactionedRows.length > 0) {
@@ -2056,7 +2079,7 @@ function WorkspaceScreen({
         // Exception: scheduling can opt back in to already-scheduled inventory via the include/exclude radio.
         : new Set(requestRows.filter(r => {
             if (!baseTargets.has(r.id)) return false;
-            if (['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status)) return true;
+            if (['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status)) return true;
             return action === 'schedule' && !excludeScheduled && r.status === 'Scheduled';
           }).map(r => r.id));
     const pendedSkipped = action !== 'release'
@@ -2101,7 +2124,7 @@ function WorkspaceScreen({
   // "Save Progress" from a schedule modal — log progress without scheduling (shows as "Progress Saved" in Actioned)
   const logProgress = (global?: boolean) => {
     const baseTargets = global ? new Set(requestRows.map(r => r.id)) : selectedRows;
-    const targetIds = new Set(requestRows.filter(r => baseTargets.has(r.id) && ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status)).map(r => r.id));
+    const targetIds = new Set(requestRows.filter(r => baseTargets.has(r.id) && ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status)).map(r => r.id));
     if (targetIds.size > 0) {
       clearUndoEntries();
       setRequestRows(prev => prev.map(r => targetIds.has(r.id) ? { ...r, status: 'Progress Logged' } : r));
@@ -2133,6 +2156,8 @@ function WorkspaceScreen({
   const needsActionCount = (statusCounts['New'] || 0);
   const unblockedCount = (statusCounts['In Progress-Unblocked'] || 0);
   const pastDueCount = 0;
+  // QA Followup is an actionable status — counted like the other Needs Action statuses.
+  const qaCount = (statusCounts['QA Followup'] || 0);
 
   // Filtered rows for display
   const filteredRows = requestRows.filter(row => {
@@ -2442,6 +2467,12 @@ function WorkspaceScreen({
                                   <Text size="xs" style={{ color: 'var(--text-contrast-minimum)' }}>In Progress-Unblocked</Text>
                                   <Text size="md" fw={700} style={{ color: 'var(--text-contrast-high)' }}>{unblockedCount}</Text>
                                 </Box>
+                                {qaCount > 0 && (
+                                  <Box>
+                                    <Text size="xs" style={{ color: 'var(--text-contrast-minimum)' }}>QA Followup</Text>
+                                    <Text size="md" fw={700} style={{ color: 'var(--text-contrast-high)' }}>{qaCount}</Text>
+                                  </Box>
+                                )}
                               </Group>
                             </Box>
 
@@ -2699,7 +2730,7 @@ function WorkspaceScreen({
                                           appearance="outline"
                                           size="xs"
                                           disabled={!canTakeAction}
-                                          onClick={(e) => { e.stopPropagation(); guardQueue(() => { setSelectedRows(new Set(rrs.filter(r => ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status)).map(r => r.id))); setActionScope('selected'); setResearchReason('not_on_file'); setActiveAction('research'); }); }}
+                                          onClick={(e) => { e.stopPropagation(); guardQueue(() => { setSelectedRows(new Set(rrs.filter(r => ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status)).map(r => r.id))); setActionScope('selected'); setResearchReason('not_on_file'); setActiveAction('research'); }); }}
                                         >
                                           Send Provider to Research
                                         </Button>
@@ -2710,7 +2741,7 @@ function WorkspaceScreen({
 
                                 const detailRows = visibleRRs.map((row) => {
                                   const isVerified = verifiedRows.has(row.id);
-                                  const isActioned = !['New', 'Past Due', 'In Progress-Unblocked'].includes(row.status);
+                                  const isActioned = !['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(row.status);
                                   const canUndoRow = isActioned && row.rowMethod !== 'Onsite';
                                   return (
                                     <Table.Tr key={row.id} style={{ borderBottom: '1px solid var(--graphic-contrast-low)' }}>
@@ -2804,7 +2835,22 @@ function WorkspaceScreen({
                                                 arrow: { backgroundColor: 'var(--graphic-contrast-high)' },
                                               }}
                                             >
-                                              <IconInfoCircle size={15} color="var(--text-data-blue)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
+                                              <IconInfoCircle size={15} color="var(--graphic-data-purple)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
+                                            </Tooltip>
+                                          </Group>
+                                        ) : row.status === 'QA Followup' ? (
+                                          <Group gap={4} align="center" wrap="nowrap">
+                                            <Text size="sm" style={{ color: 'var(--text-contrast-medium)', whiteSpace: 'nowrap' }}>QA Followup</Text>
+                                            <Tooltip
+                                              label={row.qaReason}
+                                              position="top"
+                                              withArrow
+                                              styles={{
+                                                tooltip: { backgroundColor: 'var(--graphic-contrast-high)', color: 'var(--text-contrast-inverse)', fontSize: 13, fontWeight: 500, padding: '6px 12px', borderRadius: 1000 },
+                                                arrow: { backgroundColor: 'var(--graphic-contrast-high)' },
+                                              }}
+                                            >
+                                              <IconInfoCircle size={15} color="var(--graphic-data-purple)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
                                             </Tooltip>
                                           </Group>
                                         ) : isInbound && row.status === 'Pended' && row.pendCode ? (
@@ -2951,6 +2997,12 @@ function WorkspaceScreen({
                                 <Text size="xs" style={{ color: 'var(--text-contrast-minimum)' }}>In Progress-Unblocked</Text>
                                 <Text size="md" fw={700} style={{ color: 'var(--text-contrast-high)' }}>{unblockedCount}</Text>
                               </Box>
+                              {qaCount > 0 && (
+                                <Box>
+                                  <Text size="xs" style={{ color: 'var(--text-contrast-minimum)' }}>QA Followup</Text>
+                                  <Text size="md" fw={700} style={{ color: 'var(--text-contrast-high)' }}>{qaCount}</Text>
+                                </Box>
+                              )}
                             </Group>
                           </Box>
 
@@ -3242,12 +3294,12 @@ function WorkspaceScreen({
                             )}
                           </Stack>
                           {/* RIGHT — filters, offset to line up with the top of the search box (below the toggle) */}
-                          <Group gap={8} align="center" wrap="nowrap" justify="flex-end" style={{ marginTop: 38 }}>
+                          <Group gap={8} align="center" wrap="wrap" justify="flex-end" style={{ marginTop: 38 }}>
                             <FilterPill label="Project Due Date" options={['4/1/2026', '5/1/2026', '6/1/2026']} selected={searchViewFilters['Project Due Date']} onToggle={(opt) => toggleSearchViewFilter('Project Due Date', opt)} />
                             <FilterPill label="Commitment Date" options={['No Date', '3/1/2026', '4/1/2026', '5/1/2026']} selected={searchViewFilters['Commitment Date']} onToggle={(opt) => toggleSearchViewFilter('Commitment Date', opt)} />
                             <FilterPill label="Status" options={isInbound
-                              ? ['Past Due', 'New', 'In Progress-Unblocked', 'Scheduled', 'In Research', 'PNP1', 'PNP5', 'PNP24', 'Rerouted']
-                              : ['Past Due', 'New', 'In Progress-Unblocked', 'Scheduled', 'In Research', 'Rerouted']
+                              ? ['Past Due', 'New', 'In Progress-Unblocked', 'QA Followup', 'Scheduled', 'In Research', 'PNP1', 'PNP5', 'PNP24', 'Rerouted']
+                              : ['Past Due', 'New', 'In Progress-Unblocked', 'QA Followup', 'Scheduled', 'In Research', 'Rerouted']
                             } selected={searchViewFilters['Status']} onToggle={(opt) => toggleSearchViewFilter('Status', opt)} />
                             <FilterPill label="Provider" options={PROVIDERS} selected={searchViewFilters['Provider']} onToggle={(opt) => toggleSearchViewFilter('Provider', opt)} />
                             {isInbound && <FilterPill label="Retrieval Method" options={['Offsite', 'Onsite', 'EMRR']} selected={searchViewFilters['Retrieval Method']} onToggle={(opt) => toggleSearchViewFilter('Retrieval Method', opt)} />}
@@ -3370,8 +3422,8 @@ function WorkspaceScreen({
                     const pageStart = totalMatched === 0 ? 0 : safePage * PASTE_PAGE_SIZE + 1;
                     const pageEnd = Math.min((safePage + 1) * PASTE_PAGE_SIZE, totalMatched);
 
-                    const svUnactioned = svRows.filter(r => ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status));
-                    const unactionedAll = svRowsAll.filter(r => ['New', 'Past Due', 'In Progress-Unblocked'].includes(r.status));
+                    const svUnactioned = svRows.filter(r => ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status));
+                    const unactionedAll = svRowsAll.filter(r => ['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(r.status));
                     const svAllSelected = svUnactioned.length > 0 && svUnactioned.every(r => selectedRows.has(r.id));
                     const allMatchedSelected = unactionedAll.length > 0 && unactionedAll.every(r => selectedRows.has(r.id));
                     const hasMoreMatchedToSelect = unactionedAll.length > svUnactioned.length && !allMatchedSelected;
@@ -3447,11 +3499,8 @@ function WorkspaceScreen({
                           </Box>
                         )}
 
-                        {/* Results summary row — count indicator (20-row sample, no pager) + add-to-queue */}
-                        <Group justify="space-between" align="center" mb={8}>
-                          <Text size="sm" style={{ color: 'var(--text-contrast-minimum)' }}>
-                            Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {totalMatched.toLocaleString()} RR{totalMatched !== 1 ? 's' : ''}
-                          </Text>
+                        {/* Results summary row — add-to-queue (row count indicator removed) */}
+                        <Group justify="flex-end" align="center" mb={8}>
                           {!queueMode && canTakeAction && unactionedAll.length > 0 && !allMatchedSelected && (
                             <Button intent="prominent" appearance="outline" size="xs" onClick={selectAllMatched}>
                               Add {unactionedAll.length.toLocaleString()} RR{unactionedAll.length !== 1 ? 's' : ''} to queue
@@ -3483,7 +3532,7 @@ function WorkspaceScreen({
                             </Table.Thead>
                             <Table.Tbody style={{ opacity: canTakeAction ? 1 : 0.5, pointerEvents: canTakeAction ? 'auto' : 'none' }}>
                               {svRows.map(row => {
-                                const isActioned = !['New', 'Past Due', 'In Progress-Unblocked'].includes(row.status);
+                                const isActioned = !['New', 'Past Due', 'In Progress-Unblocked', 'QA Followup'].includes(row.status);
                                 const canUndoRow = isActioned && row.rowMethod !== 'Onsite';
                                 const isSelected = selectedRows.has(row.id);
                                 return (
@@ -3518,7 +3567,14 @@ function WorkspaceScreen({
                                         <Group gap={4} align="center" wrap="nowrap">
                                           <Text size="sm" style={{ color: 'var(--text-contrast-medium)', whiteSpace: 'nowrap' }}>In Progress-Unblocked</Text>
                                           <Tooltip label={APPROVED_TIERS.length === 1 ? `Approved Amount: $${APPROVED_TIERS[0].amount}` : APPROVED_TIERS.map(t => `$${t.amount} (${t.count} RRs)`).join(' · ')} position="top" withArrow styles={{ tooltip: { backgroundColor: 'var(--graphic-contrast-high)', color: 'var(--text-contrast-inverse)', fontSize: 13, fontWeight: 500, padding: '6px 12px', borderRadius: 1000 }, arrow: { backgroundColor: 'var(--graphic-contrast-high)' } }}>
-                                            <IconInfoCircle size={15} color="var(--text-data-blue)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
+                                            <IconInfoCircle size={15} color="var(--graphic-data-purple)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
+                                          </Tooltip>
+                                        </Group>
+                                      ) : row.status === 'QA Followup' ? (
+                                        <Group gap={4} align="center" wrap="nowrap">
+                                          <Text size="sm" style={{ color: 'var(--text-contrast-medium)', whiteSpace: 'nowrap' }}>QA Followup</Text>
+                                          <Tooltip label={row.qaReason} position="top" withArrow styles={{ tooltip: { backgroundColor: 'var(--graphic-contrast-high)', color: 'var(--text-contrast-inverse)', fontSize: 13, fontWeight: 500, padding: '6px 12px', borderRadius: 1000 }, arrow: { backgroundColor: 'var(--graphic-contrast-high)' } }}>
+                                            <IconInfoCircle size={15} color="var(--graphic-data-purple)" style={{ cursor: 'default', flexShrink: 0, marginTop: 1 }} />
                                           </Tooltip>
                                         </Group>
                                       ) : isInbound && row.status === 'Pended' && row.pendCode ? (
@@ -3886,11 +3942,12 @@ function WorkspaceScreen({
         isEmrRemote || (isInbound && effectiveMethod === 'emr-remote')
           ? <EmrrSaveProgressModal count={actionScope === 'global' ? UNACTIONED_RR_COUNT : selectedRows.size} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSubmit={(status, date, pmtReq) => applyAction('schedule', actionScope === 'global', status, date, pmtReq)} siteAccessType={siteAccessType} onSiteAccessTypeChange={setSiteAccessType} paymentInfo={paymentInfo} onPaymentInfoChange={setPaymentInfo} />
           : (retrievalMethod === 'onsite' || (isInbound && effectiveMethod === 'onsite'))
-            ? <OnsiteScheduleModal count={actionScope === 'global' ? UNACTIONED_RR_COUNT : selectedRows.size} scheduledCount={requestRows.filter(r => r.status === 'Scheduled').length} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSaveProgress={() => logProgress(actionScope === 'global')} onSubmit={(status, pmtReq, excludeScheduled) => applyAction('schedule', actionScope === 'global', status || 'Scheduled', '3/1/2026', pmtReq, false, excludeScheduled)} />
+            ? <OnsiteScheduleModal count={actionScope === 'global' ? UNACTIONED_RR_COUNT : selectedRows.size} scheduledCount={requestRows.filter(r => r.status === 'Scheduled').length} defaultPaymentNo={scheduleTargetsAllQa} onClose={() => { setActiveAction(null); setActionScope('selected'); }} onSaveProgress={() => logProgress(actionScope === 'global')} onSubmit={(status, pmtReq, excludeScheduled) => applyAction('schedule', actionScope === 'global', status || 'Scheduled', '3/1/2026', pmtReq, false, excludeScheduled)} />
             : <ScheduleModal
                 count={actionScope === 'global' ? UNACTIONED_RR_COUNT : selectedRows.size}
                 unblockedCount={actionScope === 'global' ? requestRows.filter(r => r.status === 'In Progress-Unblocked').length : [...selectedRows].filter(id => requestRows.find(r => r.id === id)?.status === 'In Progress-Unblocked').length}
                 scheduledCount={requestRows.filter(r => r.status === 'Scheduled').length}
+                defaultPaymentNo={scheduleTargetsAllQa}
                 onClose={() => { setActiveAction(null); setActionScope('selected'); }}
                 onSaveProgress={() => logProgress(actionScope === 'global')}
                 onSubmit={(date, pmtReq, excludeScheduled) => applyAction('schedule', actionScope === 'global', undefined, date, pmtReq, true, excludeScheduled)}
